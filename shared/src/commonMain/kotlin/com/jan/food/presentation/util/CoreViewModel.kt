@@ -36,7 +36,6 @@ abstract class CoreViewModel<S, A>(
      */
     protected val vmLogger = logger ?: Logger()
 
-    @Suppress("PropertyName")
     protected val stateFlow = MutableStateFlow(initialState)
     val state = stateFlow.asStateFlow()
 
