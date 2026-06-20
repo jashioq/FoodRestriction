@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -6,6 +7,27 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+    alias(libs.plugins.buildConfig)
+}
+
+// App config resolved at build time: environment variable (CI) wins, then local.properties (local
+// dev). The buildConfig plugin bakes these into a generated AppConfig object compiled into the
+// binary, so they're available at runtime regardless of when Koin reads them.
+val appConfigProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+fun appConfigValue(key: String): String =
+    System.getenv(key)
+        ?: appConfigProperties.getProperty(key)
+        ?: error("Missing app config '$key': set it as an environment variable or in local.properties")
+
+buildConfig {
+    className("AppConfig")
+    packageName("com.jan.food")
+    buildConfigField("COGNITO_CLIENT_ID", appConfigValue("COGNITO_CLIENT_ID"))
+    buildConfigField("API_BASE_URL", appConfigValue("API_BASE_URL"))
 }
 
 kotlin {
