@@ -30,6 +30,9 @@ class HomeScreenViewModel(
     scope = scope,
     logger = logger,
 ) {
+    /** Most recently scanned barcode, or null when nothing is in view. Updated only from [process]. */
+    private var latestBarcode: String? = null
+
     init {
         vmScope.launch {
             emitSessionUseCase.call(Unit)
@@ -65,11 +68,20 @@ class HomeScreenViewModel(
                 }
             }
 
+            is HomeScreenAction.BarcodeDetected -> {
+                latestBarcode = barcode
+            }
+
             is HomeScreenAction.CheckProduct -> {
+                val barcode = latestBarcode
+                if (barcode == null) {
+                    vmLogger.d("check skipped", "no barcode in view")
+                    return
+                }
                 vmScope.launch {
                     checkProductUseCase.call(
                         CheckProductParams(
-                            barcode = DEFAULT_BARCODE,
+                            barcode = barcode,
                             restrictions = DEFAULT_RESTRICTIONS,
                         ),
                     ).onSuccess { productCheck ->
@@ -89,7 +101,6 @@ class HomeScreenViewModel(
     private companion object {
         const val DEFAULT_EMAIL = "test@test.com"
         const val DEFAULT_PASSWORD = "MyPass123!"
-        const val DEFAULT_BARCODE = "3017620422003"
         val DEFAULT_RESTRICTIONS = listOf("peanut", "tree_nut", "milk", "halal")
     }
 }

@@ -1,8 +1,11 @@
 package com.jan.food.presentation.screen.home
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -10,8 +13,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.jan.food.presentation.screen.onboarding.OnboardingScreenAction
-import com.jan.food.presentation.screen.onboarding.OnboardingScreenViewModel
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.jan.food.presentation.components.button.CameraCaptureButton
+import com.jan.food.presentation.components.camera.CameraPreview
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -20,11 +25,19 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    Column(
+    CameraPreview(
         modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
+        onBarcodeScanned = { barcode ->
+            viewModel.sendAction(HomeScreenAction.BarcodeDetected(barcode))
+        },
+    )
+
+    Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top
+        ) {
         Button(
             onClick = {
                 viewModel.sendAction(
@@ -45,9 +58,11 @@ fun HomeScreen(
             Text("logout")
         }
 
-        Text("id token: ${state.session?.idToken?.take(10)}\n" +
+        Text(text = "id token: ${state.session?.idToken?.take(10)}\n" +
                 "access token: ${state.session?.accessToken?.take(10)}\n" +
-                "refresh token: ${state.session?.refreshToken?.take(10)}")
+                "refresh token: ${state.session?.refreshToken?.take(10)}",
+            color = Color.White,
+        )
 
         Button(
             onClick = {
@@ -59,11 +74,22 @@ fun HomeScreen(
             Text("check nutella")
         }
 
-        Text("barcode: ${state.productCheck?.barcode}\n" +
+        Text(text = "barcode: ${state.productCheck?.barcode}\n" +
                 "name: ${state.productCheck?.name}\n" +
                 "source: ${state.productCheck?.source}\n" +
                 "found: ${state.productCheck?.found}\n" +
-                "results: ${state.productCheck?.results}\n"
+                "results:\n${state.productCheck?.results}\n",
+            color = Color.White,
+        )
+        }
+
+        CameraCaptureButton(
+            onClick = {
+                viewModel.sendAction(HomeScreenAction.CheckProduct)
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp),
         )
     }
 }
