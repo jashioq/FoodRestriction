@@ -20,8 +20,8 @@ class FoodRepository(
 
     private fun CheckResponse.toDomain(): ProductCheck =
         ProductCheck(
-            barcode = barcode,
-            name = name,
+            barcode = subject.barcode,
+            name = subject.name,
             source = source,
             found = found,
             results = results.map { RestrictionCheck(restriction = it.restriction, status = it.status) },
