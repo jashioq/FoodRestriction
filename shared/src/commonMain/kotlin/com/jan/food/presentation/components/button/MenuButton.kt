@@ -12,8 +12,8 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * Circular menu button: the shared [CircleIconButton] style, smaller than the capture button,
- * with a dark-gray hamburger icon centered inside.
+ * Circular menu button: the shared [BlurCircleButton] frosted-darkening style with a white
+ * hamburger icon centered inside.
  *
  * @param onClick invoked when the button is tapped.
  * @param modifier the [Modifier] applied to the button.
@@ -23,15 +23,14 @@ fun MenuButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    CircleIconButton(
+    BlurCircleButton(
         onClick = onClick,
         modifier = modifier,
-        size = 48.dp,
     ) {
         Icon(
             imageVector = MenuIcon,
             contentDescription = "Menu",
-            tint = DarkGray,
+            tint = Color.White,
             modifier = Modifier.size(24.dp),
         )
     }

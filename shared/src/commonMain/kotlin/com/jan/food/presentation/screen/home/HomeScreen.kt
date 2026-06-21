@@ -78,7 +78,7 @@ fun HomeScreen(
             onClick = { /* No navigation yet. */ },
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(16.dp),
+                .padding(horizontal = 16.dp),
         )
 
         CameraCaptureButton(
