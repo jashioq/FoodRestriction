@@ -10,8 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.readValue
+import kotlinx.cinterop.useContents
 import platform.AVFoundation.AVCaptureConnection
 import platform.AVFoundation.AVCaptureDevice
+import platform.AVFoundation.AVCaptureDeviceFormat
 import platform.AVFoundation.AVCaptureDeviceInput
 import platform.AVFoundation.AVCaptureDevicePositionBack
 import platform.AVFoundation.AVCaptureDeviceTypeBuiltInWideAngleCamera
@@ -19,8 +21,9 @@ import platform.AVFoundation.AVCaptureMetadataOutput
 import platform.AVFoundation.AVCaptureMetadataOutputObjectsDelegateProtocol
 import platform.AVFoundation.AVCaptureOutput
 import platform.AVFoundation.AVCaptureSession
-import platform.AVFoundation.AVCaptureSessionPresetPhoto
+import platform.AVFoundation.AVCaptureSessionPresetInputPriority
 import platform.AVFoundation.AVCaptureVideoPreviewLayer
+import platform.AVFoundation.AVFrameRateRange
 import platform.AVFoundation.AVLayerVideoGravityResizeAspectFill
 import platform.AVFoundation.AVMediaTypeVideo
 import platform.AVFoundation.AVMetadataMachineReadableCodeObject
@@ -33,6 +36,8 @@ import platform.AVFoundation.AVAuthorizationStatusNotDetermined
 import platform.AVFoundation.defaultDeviceWithDeviceType
 import platform.AVFoundation.requestAccessForMediaType
 import platform.CoreGraphics.CGRectZero
+import platform.CoreMedia.CMTimeMake
+import platform.CoreMedia.CMVideoFormatDescriptionGetDimensions
 import platform.QuartzCore.CATransaction
 import platform.QuartzCore.kCATransactionDisableActions
 import platform.UIKit.UIView
@@ -126,8 +131,10 @@ private fun startSession(
 ) {
     dispatchBackground {
         session.beginConfiguration()
-        if (session.canSetSessionPreset(AVCaptureSessionPresetPhoto)) {
-            session.sessionPreset = AVCaptureSessionPresetPhoto
+        // InputPriority lets the manually selected device format/frame rate drive the session
+        // instead of a preset overriding them.
+        if (session.canSetSessionPreset(AVCaptureSessionPresetInputPriority)) {
+            session.sessionPreset = AVCaptureSessionPresetInputPriority
         }
 
         val device = AVCaptureDevice.defaultDeviceWithDeviceType(
@@ -139,6 +146,8 @@ private fun startSession(
         if (input != null && session.canAddInput(input)) {
             session.addInput(input)
         }
+
+        device?.let { configureTargetFrameRate(it) }
 
         val metadataOutput = AVCaptureMetadataOutput()
         if (session.canAddOutput(metadataOutput)) {
@@ -156,6 +165,40 @@ private fun startSession(
         session.startRunning()
     }
 }
+
+/** Target preview frame rate; applied only when the device has a format that supports it. */
+private const val TARGET_FPS = 60.0
+
+/**
+ * Selects the highest-resolution [AVCaptureDeviceFormat] that supports [TARGET_FPS] and pins the
+ * device to that frame rate. No-op (default ~30 fps) when no format advertises the target rate.
+ */
+@OptIn(ExperimentalForeignApi::class)
+private fun configureTargetFrameRate(device: AVCaptureDevice) {
+    val format = device.formats
+        .filterIsInstance<AVCaptureDeviceFormat>()
+        .filter { fmt ->
+            fmt.videoSupportedFrameRateRanges
+                .filterIsInstance<AVFrameRateRange>()
+                .any { it.maxFrameRate >= TARGET_FPS }
+        }
+        .maxByOrNull { it.pixelCount() }
+        ?: return
+
+    if (!device.lockForConfiguration(null)) return
+    device.activeFormat = format
+    val duration = CMTimeMake(value = 1, timescale = TARGET_FPS.toInt())
+    device.setActiveVideoMinFrameDuration(duration)
+    device.setActiveVideoMaxFrameDuration(duration)
+    device.unlockForConfiguration()
+}
+
+/** Total pixel count of the format's video dimensions, used to pick the sharpest 60-fps format. */
+@OptIn(ExperimentalForeignApi::class)
+private fun AVCaptureDeviceFormat.pixelCount(): Long =
+    CMVideoFormatDescriptionGetDimensions(formatDescription).useContents {
+        width.toLong() * height.toLong()
+    }
 
 private fun dispatchBackground(block: () -> Unit) {
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
