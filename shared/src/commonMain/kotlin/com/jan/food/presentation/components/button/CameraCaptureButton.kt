@@ -1,32 +1,20 @@
 package com.jan.food.presentation.components.button
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.Box
-
-private val LightGray = Color(0xFFD9D9D9)
-private val DarkGray = Color(0xFF3F3F3F)
 
 /**
- * Circular capture button for the camera screen: light-gray fill, white border and a soft
- * drop shadow on all sides, with a filled dark-gray camera icon centered inside. While
- * [isLoading] is true the icon is replaced by a spinner and the button is not clickable.
+ * Circular capture button for the camera screen: the shared [CircleIconButton] style with a
+ * filled dark-gray camera icon centered inside. While [isLoading] is true the icon is replaced
+ * by a spinner and the button is not clickable.
  *
  * @param onClick invoked when the button is tapped.
  * @param modifier the [Modifier] applied to the button.
@@ -38,31 +26,18 @@ fun CameraCaptureButton(
     modifier: Modifier = Modifier,
     isLoading: Boolean = false,
 ) {
-    Box(
-        modifier = modifier
-            .size(72.dp)
-            .shadow(elevation = 8.dp, shape = CircleShape, clip = false)
-            .clip(CircleShape)
-            .background(LightGray)
-            .border(width = 3.dp, color = Color.White, shape = CircleShape)
-            .clickable(enabled = !isLoading, onClick = onClick),
-        contentAlignment = Alignment.Center,
+    CircleIconButton(
+        onClick = onClick,
+        modifier = modifier,
+        size = 72.dp,
+        isLoading = isLoading,
     ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                color = Color.White,
-                strokeWidth = 10.dp,
-                // 72dp button - 3dp border each side = 66dp inner, minus 3dp = 63dp.
-                modifier = Modifier.size(63.dp),
-            )
-        } else {
-            Icon(
-                imageVector = CameraIcon,
-                contentDescription = "Capture",
-                tint = DarkGray,
-                modifier = Modifier.size(32.dp),
-            )
-        }
+        Icon(
+            imageVector = CameraIcon,
+            contentDescription = "Capture",
+            tint = DarkGray,
+            modifier = Modifier.size(32.dp),
+        )
     }
 }
 

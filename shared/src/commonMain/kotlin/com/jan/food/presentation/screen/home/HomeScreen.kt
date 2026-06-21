@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.button.CameraCaptureButton
+import com.jan.food.presentation.components.button.MenuButton
 import com.jan.food.presentation.components.camera.CameraPreview
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -72,6 +73,13 @@ fun HomeScreen(
             color = Color.White,
         )
         }
+
+        MenuButton(
+            onClick = { /* No navigation yet. */ },
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp),
+        )
 
         CameraCaptureButton(
             onClick = {
