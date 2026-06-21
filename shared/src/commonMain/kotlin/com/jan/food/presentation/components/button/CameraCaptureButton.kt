@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,15 +25,18 @@ private val DarkGray = Color(0xFF3F3F3F)
 
 /**
  * Circular capture button for the camera screen: light-gray fill, white border and a soft
- * drop shadow on all sides, with a filled dark-gray camera icon centered inside.
+ * drop shadow on all sides, with a filled dark-gray camera icon centered inside. While
+ * [isLoading] is true the icon is replaced by a spinner and the button is not clickable.
  *
  * @param onClick invoked when the button is tapped.
  * @param modifier the [Modifier] applied to the button.
+ * @param isLoading when true, shows a spinner instead of the icon and disables tapping.
  */
 @Composable
 fun CameraCaptureButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isLoading: Boolean = false,
 ) {
     Box(
         modifier = modifier
@@ -41,15 +45,24 @@ fun CameraCaptureButton(
             .clip(CircleShape)
             .background(LightGray)
             .border(width = 3.dp, color = Color.White, shape = CircleShape)
-            .clickable(onClick = onClick),
+            .clickable(enabled = !isLoading, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = CameraIcon,
-            contentDescription = "Capture",
-            tint = DarkGray,
-            modifier = Modifier.size(32.dp),
-        )
+        if (isLoading) {
+            CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 10.dp,
+                // 72dp button - 3dp border each side = 66dp inner, minus 3dp = 63dp.
+                modifier = Modifier.size(63.dp),
+            )
+        } else {
+            Icon(
+                imageVector = CameraIcon,
+                contentDescription = "Capture",
+                tint = DarkGray,
+                modifier = Modifier.size(32.dp),
+            )
+        }
     }
 }
 

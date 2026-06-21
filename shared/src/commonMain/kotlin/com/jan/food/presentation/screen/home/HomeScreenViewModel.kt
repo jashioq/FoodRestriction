@@ -26,6 +26,7 @@ class HomeScreenViewModel(
     initialState = HomeScreenState(
         session = null,
         productCheck = null,
+        isLoading = false,
     ),
     scope = scope,
     logger = logger,
@@ -79,6 +80,7 @@ class HomeScreenViewModel(
                     return
                 }
                 vmScope.launch {
+                    stateFlow.update { state -> state.copy(isLoading = true) }
                     checkProductUseCase.call(
                         CheckProductParams(
                             barcode = barcode,
@@ -88,10 +90,12 @@ class HomeScreenViewModel(
                         stateFlow.update { state ->
                             state.copy(
                                 productCheck = productCheck,
+                                isLoading = false,
                             )
                         }
                     }.onFailure {
                         vmLogger.e("check error", it.message?: "", null)
+                        stateFlow.update { state -> state.copy(isLoading = false) }
                     }
                 }
             }

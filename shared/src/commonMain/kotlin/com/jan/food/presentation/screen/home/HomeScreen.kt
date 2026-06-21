@@ -87,6 +87,7 @@ fun HomeScreen(
             onClick = {
                 viewModel.sendAction(HomeScreenAction.CheckProduct)
             },
+            isLoading = state.isLoading,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp),
