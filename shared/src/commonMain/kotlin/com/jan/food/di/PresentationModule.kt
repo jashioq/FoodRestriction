@@ -2,6 +2,7 @@ package com.jan.food.di
 
 import com.jan.food.domain.useCase.CheckProductUseCase
 import com.jan.food.domain.useCase.EmitOnboardingFinishedUseCase
+import com.jan.food.domain.useCase.EmitSelectedAllergensUseCase
 import com.jan.food.domain.useCase.EmitSessionUseCase
 import com.jan.food.domain.useCase.LoginUseCase
 import com.jan.food.domain.useCase.LogoutUseCase
@@ -30,6 +31,7 @@ val presentationModule = module {
             logoutUseCase = get<LogoutUseCase>(),
             emitSessionUseCase = get<EmitSessionUseCase>(),
             checkProductUseCase = get<CheckProductUseCase>(),
+            emitSelectedAllergensUseCase = get<EmitSelectedAllergensUseCase>(),
         )
     }
 }

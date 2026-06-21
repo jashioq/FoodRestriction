@@ -1,5 +1,6 @@
 package com.jan.food.presentation.screen.home
 
+import com.jan.food.domain.model.Allergen
 import com.jan.food.domain.model.AuthSession
 import com.jan.food.domain.model.ProductCheck
 import com.jan.food.domain.useCase.CheckProductParams
@@ -20,6 +21,7 @@ class HomeScreenViewModel(
     private val logoutUseCase: UseCase<Unit, Unit>,
     private val emitSessionUseCase: UseCase<Unit, Flow<AuthSession?>>,
     private val checkProductUseCase: UseCase<CheckProductParams, ProductCheck>,
+    private val emitSelectedAllergensUseCase: UseCase<Unit, Flow<List<Allergen>>>,
     scope: CoroutineScope? = null,
     logger: Logger? = null,
 ) : CoreViewModel<HomeScreenState, HomeScreenAction>(
@@ -34,6 +36,9 @@ class HomeScreenViewModel(
     /** Most recently scanned barcode, or null when nothing is in view. Updated only from [process]. */
     private var latestBarcode: String? = null
 
+    /** Most recently emitted allergen selection, sent with the next check. Updated only from [init]. */
+    private var latestAllergens: List<Allergen> = emptyList()
+
     init {
         vmScope.launch {
             emitSessionUseCase.call(Unit)
@@ -45,6 +50,15 @@ class HomeScreenViewModel(
                             )
                         }
                         vmLogger.d("session tokens", session.toString())
+                    }
+                }
+        }
+
+        vmScope.launch {
+            emitSelectedAllergensUseCase.call(Unit)
+                .onSuccess { allergens ->
+                    allergens.collect { selection ->
+                        latestAllergens = selection
                     }
                 }
         }
@@ -84,7 +98,7 @@ class HomeScreenViewModel(
                     checkProductUseCase.call(
                         CheckProductParams(
                             barcode = barcode,
-                            restrictions = DEFAULT_RESTRICTIONS,
+                            restrictions = latestAllergens.map { it.tag },
                         ),
                     ).onSuccess { productCheck ->
                         stateFlow.update { state ->
@@ -105,6 +119,5 @@ class HomeScreenViewModel(
     private companion object {
         const val DEFAULT_EMAIL = "test@test.com"
         const val DEFAULT_PASSWORD = "MyPass123!"
-        val DEFAULT_RESTRICTIONS = listOf("peanut", "tree_nut", "milk", "halal")
     }
 }

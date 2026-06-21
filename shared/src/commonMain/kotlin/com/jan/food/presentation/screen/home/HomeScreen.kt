@@ -64,16 +64,6 @@ fun HomeScreen(
             color = Color.White,
         )
 
-        Button(
-            onClick = {
-                viewModel.sendAction(
-                    HomeScreenAction.CheckProduct
-                )
-            }
-        ) {
-            Text("check nutella")
-        }
-
         Text(text = "barcode: ${state.productCheck?.barcode}\n" +
                 "name: ${state.productCheck?.name}\n" +
                 "source: ${state.productCheck?.source}\n" +

@@ -3,6 +3,7 @@ package com.jan.food.di
 import com.jan.food.AppConfig
 import com.jan.food.data.dataSource.auth.CognitoAuthClient
 import com.jan.food.data.dataSource.food.FoodRemoteDataSource
+import com.jan.food.data.repository.AllergenRepository
 import com.jan.food.data.repository.AuthRepository
 import com.jan.food.data.repository.DataStoreRepository
 import com.jan.food.data.repository.FoodRepository
@@ -32,6 +33,9 @@ val dataModule = module {
     }
     single<com.jan.food.domain.repository.SecureStorageRepository> {
         SecureStorageRepository(secureStore = get())
+    }
+    single<com.jan.food.domain.repository.AllergenRepository> {
+        AllergenRepository(dataStore = get())
     }
 
     // Lenient JSON, shared by the Cognito client and the authed app-API client.

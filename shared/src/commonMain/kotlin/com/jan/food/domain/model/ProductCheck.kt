@@ -3,14 +3,14 @@ package com.jan.food.domain.model
 /**
  * The result of checking a product against a set of dietary restrictions.
  * @param barcode the looked-up product barcode.
- * @param name the product name.
- * @param source the data source, one of `off`, `cache`, `unknown`.
+ * @param name the product name, `null` when the product was not found.
+ * @param source the data source, one of `usda`, `off`, `cache`, `unknown`.
  * @param found whether the product was found.
  * @param results the per-restriction evaluation results.
  */
 data class ProductCheck(
     val barcode: String,
-    val name: String,
+    val name: String?,
     val source: String,
     val found: Boolean,
     val results: List<RestrictionCheck>,
@@ -19,7 +19,7 @@ data class ProductCheck(
 /**
  * The evaluation of a single dietary restriction against a product.
  * @param restriction the restriction identifier.
- * @param status the evaluation status, one of `contains`, `absent`, `unknown`.
+ * @param status the evaluation status, one of `contains`, `may_contain`, `absent`, `unknown`.
  */
 data class RestrictionCheck(
     val restriction: String,

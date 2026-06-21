@@ -27,7 +27,7 @@ class FoodRemoteDataSource(
     ): Result<CheckResponse> = runCatching {
         httpClient.post("/v1/check") {
             contentType(ContentType.Application.Json)
-            setBody(CheckRequest(barcode = barcode, restrictions = restrictions))
+            setBody(CheckRequest(barcode = barcode, requestedRestrictions = restrictions))
         }.body()
     }
 }
