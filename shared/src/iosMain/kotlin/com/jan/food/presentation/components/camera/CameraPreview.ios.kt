@@ -2,11 +2,13 @@ package com.jan.food.presentation.components.camera
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.viewinterop.UIKitInteropProperties
 import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.readValue
@@ -17,6 +19,16 @@ import platform.AVFoundation.AVCaptureDeviceFormat
 import platform.AVFoundation.AVCaptureDeviceInput
 import platform.AVFoundation.AVCaptureDevicePositionBack
 import platform.AVFoundation.AVCaptureDeviceTypeBuiltInWideAngleCamera
+import platform.AVFoundation.AVCaptureExposureModeContinuousAutoExposure
+import platform.AVFoundation.AVCaptureFocusModeAutoFocus
+import platform.AVFoundation.exposurePointOfInterestSupported
+import platform.AVFoundation.focusPointOfInterestSupported
+import platform.AVFoundation.isExposureModeSupported
+import platform.AVFoundation.isFocusModeSupported
+import platform.AVFoundation.setExposureMode
+import platform.AVFoundation.setExposurePointOfInterest
+import platform.AVFoundation.setFocusMode
+import platform.AVFoundation.setFocusPointOfInterest
 import platform.AVFoundation.AVCaptureMetadataOutput
 import platform.AVFoundation.AVCaptureMetadataOutputObjectsDelegateProtocol
 import platform.AVFoundation.AVCaptureOutput
@@ -35,6 +47,7 @@ import platform.AVFoundation.AVAuthorizationStatusAuthorized
 import platform.AVFoundation.AVAuthorizationStatusNotDetermined
 import platform.AVFoundation.defaultDeviceWithDeviceType
 import platform.AVFoundation.requestAccessForMediaType
+import platform.CoreGraphics.CGPointMake
 import platform.CoreGraphics.CGRectZero
 import platform.CoreMedia.CMTimeMake
 import platform.CoreMedia.CMVideoFormatDescriptionGetDimensions
@@ -52,9 +65,13 @@ import platform.darwin.dispatch_get_main_queue
 actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
+    focusRequest: FocusRequest?,
 ) {
     val session = remember { AVCaptureSession() }
     val previewLayer = remember { AVCaptureVideoPreviewLayer(session = session) }
+    // Retains the selected capture device so the focus effect can reach it; it is otherwise a local
+    // inside startSession and would not survive past configuration.
+    val deviceHolder = remember { DeviceHolder() }
 
     // Barcode scanning pipeline: the metadata delegate feeds the debouncer, which surfaces the
     // callback. The delegate is remembered so Kotlin/Native ARC doesn't collect it while
@@ -68,10 +85,14 @@ actual fun CameraPreview(
         previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill
 
         when (AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)) {
-            AVAuthorizationStatusAuthorized -> startSession(session, delegate)
+            AVAuthorizationStatusAuthorized -> startSession(session, delegate) {
+                deviceHolder.device = it
+            }
             AVAuthorizationStatusNotDetermined -> AVCaptureDevice.requestAccessForMediaType(
                 AVMediaTypeVideo,
-            ) { granted -> if (granted) startSession(session, delegate) }
+            ) { granted ->
+                if (granted) startSession(session, delegate) { deviceHolder.device = it }
+            }
             else -> Unit
         }
 
@@ -83,7 +104,43 @@ actual fun CameraPreview(
     UIKitView(
         factory = { CameraContainerView(previewLayer) },
         modifier = modifier,
+        // The preview is a pure display surface; making the interop view non-interactive lets taps
+        // fall through to the Compose gesture detector above it (otherwise the interop wrapper
+        // swallows them and tap-to-focus / the reticle never fire).
+        properties = UIKitInteropProperties(interactionMode = null),
     )
+
+    LaunchedEffect(focusRequest) {
+        val request = focusRequest ?: return@LaunchedEffect
+        val device = deviceHolder.device ?: return@LaunchedEffect
+
+        val layerPoint = CGPointMake(
+            request.x.toDouble() * previewLayer.bounds.useContents { size.width },
+            request.y.toDouble() * previewLayer.bounds.useContents { size.height },
+        )
+        val devicePoint = previewLayer.captureDevicePointOfInterestForPoint(layerPoint)
+
+        if (!device.lockForConfiguration(null)) return@LaunchedEffect
+        if (device.focusPointOfInterestSupported &&
+            device.isFocusModeSupported(AVCaptureFocusModeAutoFocus)
+        ) {
+            device.setFocusPointOfInterest(devicePoint)
+            device.setFocusMode(AVCaptureFocusModeAutoFocus)
+        }
+        if (device.exposurePointOfInterestSupported &&
+            device.isExposureModeSupported(AVCaptureExposureModeContinuousAutoExposure)
+        ) {
+            device.setExposurePointOfInterest(devicePoint)
+            device.setExposureMode(AVCaptureExposureModeContinuousAutoExposure)
+        }
+        device.unlockForConfiguration()
+    }
+}
+
+/** Retains the selected [AVCaptureDevice] so the focus effect can reconfigure it after a tap. */
+@OptIn(ExperimentalForeignApi::class)
+private class DeviceHolder {
+    var device: AVCaptureDevice? = null
 }
 
 /** [UIView] that keeps the capture preview layer sized to its bounds across layout passes. */
@@ -128,6 +185,7 @@ private class BarcodeScanDelegate(
 private fun startSession(
     session: AVCaptureSession,
     delegate: AVCaptureMetadataOutputObjectsDelegateProtocol,
+    onDevice: (AVCaptureDevice) -> Unit,
 ) {
     dispatchBackground {
         session.beginConfiguration()
@@ -147,7 +205,10 @@ private fun startSession(
             session.addInput(input)
         }
 
-        device?.let { configureTargetFrameRate(it) }
+        device?.let {
+            configureTargetFrameRate(it)
+            onDevice(it)
+        }
 
         val metadataOutput = AVCaptureMetadataOutput()
         if (session.canAddOutput(metadataOutput)) {

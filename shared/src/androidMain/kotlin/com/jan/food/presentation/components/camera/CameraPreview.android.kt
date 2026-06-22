@@ -4,8 +4,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import androidx.camera.core.Preview
@@ -33,11 +35,13 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @Composable
 actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
+    focusRequest: FocusRequest?,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -82,16 +86,21 @@ actual fun CameraPreview(
         }
     }
 
+    // Held so the focus effect can reach the PreviewView's metering factory and the bound camera,
+    // both of which are otherwise scoped to the AndroidView factory / provider listener.
+    val previewView = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
+    }
+    val cameraHolder = remember { CameraHolder() }
+
     if (!hasPermission) return
 
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            val previewView = PreviewView(ctx).apply {
-                scaleType = PreviewView.ScaleType.FILL_CENTER
-                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-            }
-
             val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
@@ -116,7 +125,7 @@ actual fun CameraPreview(
                     }
 
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
+                cameraHolder.camera = cameraProvider.bindToLifecycle(
                     lifecycleOwner,
                     CameraSelector.DEFAULT_BACK_CAMERA,
                     preview,
@@ -127,6 +136,30 @@ actual fun CameraPreview(
             previewView
         },
     )
+
+    LaunchedEffect(focusRequest) {
+        val request = focusRequest ?: return@LaunchedEffect
+        val camera = cameraHolder.camera ?: return@LaunchedEffect
+        if (previewView.width == 0 || previewView.height == 0) return@LaunchedEffect
+
+        val point = previewView.meteringPointFactory.createPoint(
+            request.x * previewView.width,
+            request.y * previewView.height,
+        )
+        val action = FocusMeteringAction.Builder(
+            point,
+            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE,
+        ).setAutoCancelDuration(AUTO_CANCEL_SECONDS, TimeUnit.SECONDS).build()
+        camera.cameraControl.startFocusAndMetering(action)
+    }
+}
+
+/** How long CameraX keeps the manual focus before reverting to continuous auto-focus. */
+private const val AUTO_CANCEL_SECONDS = 3L
+
+/** Mutable handle for the [Camera] bound asynchronously inside the provider listener. */
+private class CameraHolder {
+    var camera: Camera? = null
 }
 
 /** Feeds CameraX frames to ML Kit and reports the first decoded barcode of each frame. */
