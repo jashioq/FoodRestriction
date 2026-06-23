@@ -18,12 +18,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.button.CameraCaptureButton
 import com.jan.food.presentation.components.button.MenuButton
+import com.jan.food.presentation.components.button.TapPulseState
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun HomeScreen(
     barcode: String?,
     onMenuClick: () -> Unit,
+    menuButtonPulse: TapPulseState? = null,
     viewModel: HomeScreenViewModel = koinViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -76,6 +78,8 @@ fun HomeScreen(
 
         MenuButton(
             onClick = onMenuClick,
+            // Shared with the menu's back button so the two pulse in sync across navigation.
+            pulse = menuButtonPulse,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(horizontal = 16.dp),

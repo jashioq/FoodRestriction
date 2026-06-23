@@ -9,6 +9,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.jan.food.presentation.components.button.rememberTapPulseState
 import com.jan.food.presentation.components.camera.CameraBackground
 import com.jan.food.presentation.screen.home.HomeScreen
 import com.jan.food.presentation.screen.home.HomeScreenDestination
@@ -20,6 +21,10 @@ fun MainNavHost() {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val onMenu = backStackEntry?.destination?.hasRoute(MenuScreenDestination::class) == true
+
+    // One pulse shared by the home menu button and the menu's back button: because both read the
+    // same color, tapping one carries its animation straight into the other across the cross-fade.
+    val navButtonPulse = rememberTapPulseState()
 
     CameraBackground(blurred = onMenu) { barcode ->
         NavHost(
@@ -35,12 +40,14 @@ fun MainNavHost() {
                 HomeScreen(
                     barcode = barcode,
                     onMenuClick = { navController.navigate(MenuScreenDestination) },
+                    menuButtonPulse = navButtonPulse,
                 )
             }
 
             composable<MenuScreenDestination> {
                 MenuScreen(
                     onBackClick = { navController.popBackStack() },
+                    backButtonPulse = navButtonPulse,
                 )
             }
         }

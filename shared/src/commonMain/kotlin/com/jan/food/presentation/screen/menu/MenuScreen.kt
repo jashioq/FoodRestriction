@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.button.BackButton
+import com.jan.food.presentation.components.button.TapPulseState
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
@@ -25,6 +26,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun MenuScreen(
     onBackClick: () -> Unit,
+    backButtonPulse: TapPulseState? = null,
     viewModel: MenuScreenViewModel = koinViewModel(),
 ) {
     Box(
@@ -36,6 +38,8 @@ fun MenuScreen(
     Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
         BackButton(
             onClick = onBackClick,
+            // Shared with the home menu button so the two pulse in sync across navigation.
+            pulse = backButtonPulse,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(horizontal = 16.dp),

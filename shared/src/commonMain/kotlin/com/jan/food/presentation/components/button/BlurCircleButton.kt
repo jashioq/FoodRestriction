@@ -1,9 +1,5 @@
 package com.jan.food.presentation.components.button
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutLinearInEasing
-import androidx.compose.animation.VectorConverter
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -43,7 +39,11 @@ import androidx.compose.ui.unit.dp
  * @param tapColor the color the circle eases to while pressed.
  * @param tapColorAlpha the alpha of the solid part of the circle while pressed (`0f`..`1f`).
  * @param tapAnimationMillis the total duration of one full tap animation (base → tap → base);
- * each half runs for half this value.
+ * each half runs for half this value. Ignored when [pulse] is supplied.
+ * @param pulse an external, hoisted color animation to drive the circle. Share one [TapPulseState]
+ * across buttons to make them pulse in sync (e.g. across a navigation). When `null`, the button
+ * uses its own private state and animates itself on press as usual; the color params above then
+ * configure that private state.
  * @param content the centered, sharp button content.
  */
 @Composable
@@ -58,6 +58,7 @@ fun BlurCircleButton(
     tapColor: Color = Color.White,
     tapColorAlpha: Float = 0.4f,
     tapAnimationMillis: Int = 350,
+    pulse: TapPulseState? = null,
     content: @Composable () -> Unit,
 ) {
     // The tappable / layout footprint is the full circle including its fade band.
@@ -65,28 +66,21 @@ fun BlurCircleButton(
 
     val interactionSource = remember { MutableInteractionSource() }
 
-    val baseColor = blurColor.copy(alpha = blurColorAlpha)
-    val pressedColor = tapColor.copy(alpha = tapColorAlpha)
-
-    // Drives the solid color manually so each press plays the full base → tap → base sequence
-    // rather than reversing on release.
-    val solidColorAnim = remember { Animatable(baseColor, Color.VectorConverter(baseColor.colorSpace)) }
-    val solidColor = solidColorAnim.value
+    // Use the supplied (hoisted) pulse, or fall back to a private one configured by the color
+    // params so the button still animates itself on press when used standalone.
+    val internalPulse = rememberTapPulseState(
+        baseColor = blurColor.copy(alpha = blurColorAlpha),
+        pressedColor = tapColor.copy(alpha = tapColorAlpha),
+        pulseMillis = tapAnimationMillis,
+    )
+    val activePulse = pulse ?: internalPulse
+    val solidColor = activePulse.color
 
     // Replay the full sequence on every press, regardless of how long the press is held.
-    LaunchedEffect(interactionSource) {
+    LaunchedEffect(interactionSource, activePulse) {
         interactionSource.interactions.collect { interaction ->
             if (interaction is PressInteraction.Press) {
-                val half = tapAnimationMillis / 2
-                solidColorAnim.snapTo(baseColor)
-                solidColorAnim.animateTo(
-                    targetValue = pressedColor,
-                    animationSpec = tween(durationMillis = half, easing = FastOutLinearInEasing),
-                )
-                solidColorAnim.animateTo(
-                    targetValue = baseColor,
-                    animationSpec = tween(durationMillis = half, easing = FastOutLinearInEasing),
-                )
+                activePulse.pulse()
             }
         }
     }

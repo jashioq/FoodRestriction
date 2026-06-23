@@ -17,15 +17,19 @@ import androidx.compose.ui.unit.dp
  *
  * @param onClick invoked when the button is tapped.
  * @param modifier the [Modifier] applied to the button.
+ * @param pulse an optional shared color animation (see [BlurCircleButton]); `null` lets the button
+ * animate itself.
  */
 @Composable
 fun MenuButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    pulse: TapPulseState? = null,
 ) {
     BlurCircleButton(
         onClick = onClick,
         modifier = modifier,
+        pulse = pulse,
     ) {
         Icon(
             imageVector = MenuIcon,
