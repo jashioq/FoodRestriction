@@ -2,7 +2,6 @@ package com.jan.food.presentation.components.camera
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -13,25 +12,23 @@ import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.readValue
 import kotlinx.cinterop.useContents
+import platform.AVFoundation.AVAuthorizationStatusAuthorized
+import platform.AVFoundation.AVAuthorizationStatusNotDetermined
 import platform.AVFoundation.AVCaptureConnection
 import platform.AVFoundation.AVCaptureDevice
 import platform.AVFoundation.AVCaptureDeviceFormat
 import platform.AVFoundation.AVCaptureDeviceInput
 import platform.AVFoundation.AVCaptureDevicePositionBack
+import platform.AVFoundation.AVCaptureDeviceType
+import platform.AVFoundation.AVCaptureDeviceTypeBuiltInDualWideCamera
+import platform.AVFoundation.AVCaptureDeviceTypeBuiltInTripleCamera
 import platform.AVFoundation.AVCaptureDeviceTypeBuiltInWideAngleCamera
-import platform.AVFoundation.AVCaptureExposureModeContinuousAutoExposure
-import platform.AVFoundation.AVCaptureFocusModeAutoFocus
-import platform.AVFoundation.exposurePointOfInterestSupported
-import platform.AVFoundation.focusPointOfInterestSupported
-import platform.AVFoundation.isExposureModeSupported
-import platform.AVFoundation.isFocusModeSupported
-import platform.AVFoundation.setExposureMode
-import platform.AVFoundation.setExposurePointOfInterest
-import platform.AVFoundation.setFocusMode
-import platform.AVFoundation.setFocusPointOfInterest
 import platform.AVFoundation.AVCaptureMetadataOutput
 import platform.AVFoundation.AVCaptureMetadataOutputObjectsDelegateProtocol
 import platform.AVFoundation.AVCaptureOutput
+import platform.AVFoundation.AVCapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditionNone
+import platform.AVFoundation.AVCapturePrimaryConstituentDeviceSwitchingBehaviorAuto
+import platform.AVFoundation.AVCapturePrimaryConstituentDeviceSwitchingBehaviorUnsupported
 import platform.AVFoundation.AVCaptureSession
 import platform.AVFoundation.AVCaptureSessionPresetInputPriority
 import platform.AVFoundation.AVCaptureVideoPreviewLayer
@@ -42,12 +39,12 @@ import platform.AVFoundation.AVMetadataMachineReadableCodeObject
 import platform.AVFoundation.AVMetadataObjectTypeEAN13Code
 import platform.AVFoundation.AVMetadataObjectTypeEAN8Code
 import platform.AVFoundation.AVMetadataObjectTypeUPCECode
+import platform.AVFoundation.activePrimaryConstituentDeviceSwitchingBehavior
 import platform.AVFoundation.authorizationStatusForMediaType
-import platform.AVFoundation.AVAuthorizationStatusAuthorized
-import platform.AVFoundation.AVAuthorizationStatusNotDetermined
 import platform.AVFoundation.defaultDeviceWithDeviceType
+import platform.AVFoundation.isVirtualDevice
 import platform.AVFoundation.requestAccessForMediaType
-import platform.CoreGraphics.CGPointMake
+import platform.AVFoundation.setPrimaryConstituentDeviceSwitchingBehavior
 import platform.CoreGraphics.CGRectZero
 import platform.CoreMedia.CMTimeMake
 import platform.CoreMedia.CMVideoFormatDescriptionGetDimensions
@@ -65,13 +62,9 @@ import platform.darwin.dispatch_get_main_queue
 actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
-    focusRequest: FocusRequest?,
 ) {
     val session = remember { AVCaptureSession() }
     val previewLayer = remember { AVCaptureVideoPreviewLayer(session = session) }
-    // Retains the selected capture device so the focus effect can reach it; it is otherwise a local
-    // inside startSession and would not survive past configuration.
-    val deviceHolder = remember { DeviceHolder() }
 
     // Barcode scanning pipeline: the metadata delegate feeds the debouncer, which surfaces the
     // callback. The delegate is remembered so Kotlin/Native ARC doesn't collect it while
@@ -85,62 +78,22 @@ actual fun CameraPreview(
         previewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill
 
         when (AVCaptureDevice.authorizationStatusForMediaType(AVMediaTypeVideo)) {
-            AVAuthorizationStatusAuthorized -> startSession(session, delegate) {
-                deviceHolder.device = it
-            }
+            AVAuthorizationStatusAuthorized -> startSession(session, delegate)
             AVAuthorizationStatusNotDetermined -> AVCaptureDevice.requestAccessForMediaType(
                 AVMediaTypeVideo,
-            ) { granted ->
-                if (granted) startSession(session, delegate) { deviceHolder.device = it }
-            }
+            ) { granted -> if (granted) startSession(session, delegate) }
             else -> Unit
         }
 
-        onDispose {
-            dispatchBackground { session.stopRunning() }
-        }
+        onDispose { dispatchBackground { session.stopRunning() } }
     }
 
     UIKitView(
         factory = { CameraContainerView(previewLayer) },
         modifier = modifier,
-        // The preview is a pure display surface; making the interop view non-interactive lets taps
-        // fall through to the Compose gesture detector above it (otherwise the interop wrapper
-        // swallows them and tap-to-focus / the reticle never fire).
+        // A passive display surface with no touch handling of its own.
         properties = UIKitInteropProperties(interactionMode = null),
     )
-
-    LaunchedEffect(focusRequest) {
-        val request = focusRequest ?: return@LaunchedEffect
-        val device = deviceHolder.device ?: return@LaunchedEffect
-
-        val layerPoint = CGPointMake(
-            request.x.toDouble() * previewLayer.bounds.useContents { size.width },
-            request.y.toDouble() * previewLayer.bounds.useContents { size.height },
-        )
-        val devicePoint = previewLayer.captureDevicePointOfInterestForPoint(layerPoint)
-
-        if (!device.lockForConfiguration(null)) return@LaunchedEffect
-        if (device.focusPointOfInterestSupported &&
-            device.isFocusModeSupported(AVCaptureFocusModeAutoFocus)
-        ) {
-            device.setFocusPointOfInterest(devicePoint)
-            device.setFocusMode(AVCaptureFocusModeAutoFocus)
-        }
-        if (device.exposurePointOfInterestSupported &&
-            device.isExposureModeSupported(AVCaptureExposureModeContinuousAutoExposure)
-        ) {
-            device.setExposurePointOfInterest(devicePoint)
-            device.setExposureMode(AVCaptureExposureModeContinuousAutoExposure)
-        }
-        device.unlockForConfiguration()
-    }
-}
-
-/** Retains the selected [AVCaptureDevice] so the focus effect can reconfigure it after a tap. */
-@OptIn(ExperimentalForeignApi::class)
-private class DeviceHolder {
-    var device: AVCaptureDevice? = null
 }
 
 /** [UIView] that keeps the capture preview layer sized to its bounds across layout passes. */
@@ -181,11 +134,11 @@ private class BarcodeScanDelegate(
     }
 }
 
+/** Builds the capture session on a background queue: camera input + barcode metadata output. */
 @OptIn(ExperimentalForeignApi::class)
 private fun startSession(
     session: AVCaptureSession,
     delegate: AVCaptureMetadataOutputObjectsDelegateProtocol,
-    onDevice: (AVCaptureDevice) -> Unit,
 ) {
     dispatchBackground {
         session.beginConfiguration()
@@ -195,20 +148,12 @@ private fun startSession(
             session.sessionPreset = AVCaptureSessionPresetInputPriority
         }
 
-        val device = AVCaptureDevice.defaultDeviceWithDeviceType(
-            deviceType = AVCaptureDeviceTypeBuiltInWideAngleCamera,
-            mediaType = AVMediaTypeVideo,
-            position = AVCaptureDevicePositionBack,
-        )
+        val device = selectBackCamera()
         val input = device?.let { AVCaptureDeviceInput.deviceInputWithDevice(it, null) }
         if (input != null && session.canAddInput(input)) {
             session.addInput(input)
         }
-
-        device?.let {
-            configureTargetFrameRate(it)
-            onDevice(it)
-        }
+        device?.let { configureBackCamera(it) }
 
         val metadataOutput = AVCaptureMetadataOutput()
         if (session.canAddOutput(metadataOutput)) {
@@ -227,34 +172,79 @@ private fun startSession(
     }
 }
 
-/** Target preview frame rate; applied only when the device has a format that supports it. */
+/**
+ * Picks the back camera, preferring a multi-lens virtual device that includes the ultra-wide lens
+ * (triple, then dual-wide) so the system can automatically switch to it for macro (close-up) focus,
+ * exactly like the stock Camera app. Falls back to the plain wide-angle camera on phones without a
+ * macro-capable lens.
+ */
+@OptIn(ExperimentalForeignApi::class)
+private fun selectBackCamera(): AVCaptureDevice? {
+    fun deviceOfType(type: AVCaptureDeviceType) = AVCaptureDevice.defaultDeviceWithDeviceType(
+        deviceType = type,
+        mediaType = AVMediaTypeVideo,
+        position = AVCaptureDevicePositionBack,
+    )
+    return deviceOfType(AVCaptureDeviceTypeBuiltInTripleCamera)
+        ?: deviceOfType(AVCaptureDeviceTypeBuiltInDualWideCamera)
+        ?: deviceOfType(AVCaptureDeviceTypeBuiltInWideAngleCamera)
+}
+
+/** Target preview frame rate; applied only when a format supports it without disabling macro. */
 private const val TARGET_FPS = 60.0
 
 /**
- * Selects the highest-resolution [AVCaptureDeviceFormat] that supports [TARGET_FPS] and pins the
- * device to that frame rate. No-op (default ~30 fps) when no format advertises the target rate.
+ * Configures the chosen camera: enables automatic macro switching and pins the sharpest 60 fps
+ * format — but never at the cost of macro. On a multi-lens device, if the high-frame-rate format
+ * turns out to disable lens switching, the default format (~30 fps) is kept instead, since macro is
+ * the more useful capability for scanning items up close.
  */
 @OptIn(ExperimentalForeignApi::class)
-private fun configureTargetFrameRate(device: AVCaptureDevice) {
-    val format = device.formats
-        .filterIsInstance<AVCaptureDeviceFormat>()
-        .filter { fmt ->
-            fmt.videoSupportedFrameRateRanges
-                .filterIsInstance<AVFrameRateRange>()
-                .any { it.maxFrameRate >= TARGET_FPS }
-        }
-        .maxByOrNull { it.pixelCount() }
-        ?: return
-
+private fun configureBackCamera(device: AVCaptureDevice) {
     if (!device.lockForConfiguration(null)) return
-    device.activeFormat = format
-    val duration = CMTimeMake(value = 1, timescale = TARGET_FPS.toInt())
-    device.setActiveVideoMinFrameDuration(duration)
-    device.setActiveVideoMaxFrameDuration(duration)
+
+    if (device.isVirtualDevice()) {
+        device.setPrimaryConstituentDeviceSwitchingBehavior(
+            AVCapturePrimaryConstituentDeviceSwitchingBehaviorAuto,
+            AVCapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditionNone,
+        )
+    }
+
+    val fastestFormat = device.formats
+        .filterIsInstance<AVCaptureDeviceFormat>()
+        .filter { format -> format.supportsFrameRate(TARGET_FPS) }
+        .maxByOrNull { it.pixelCount() }
+
+    if (fastestFormat != null) {
+        val defaultFormat = device.activeFormat
+        device.activeFormat = fastestFormat
+        if (device.disabledMacroSwitching()) {
+            device.activeFormat = defaultFormat
+        } else {
+            val duration = CMTimeMake(value = 1, timescale = TARGET_FPS.toInt())
+            device.setActiveVideoMinFrameDuration(duration)
+            device.setActiveVideoMaxFrameDuration(duration)
+        }
+    }
+
     device.unlockForConfiguration()
 }
 
-/** Total pixel count of the format's video dimensions, used to pick the sharpest 60-fps format. */
+/** True once the active format has left a virtual device unable to auto-switch lenses (macro). */
+@OptIn(ExperimentalForeignApi::class)
+private fun AVCaptureDevice.disabledMacroSwitching(): Boolean =
+    isVirtualDevice() &&
+        activePrimaryConstituentDeviceSwitchingBehavior ==
+        AVCapturePrimaryConstituentDeviceSwitchingBehaviorUnsupported
+
+/** Whether any of the format's frame-rate ranges reaches [fps]. */
+@OptIn(ExperimentalForeignApi::class)
+private fun AVCaptureDeviceFormat.supportsFrameRate(fps: Double): Boolean =
+    videoSupportedFrameRateRanges
+        .filterIsInstance<AVFrameRateRange>()
+        .any { it.maxFrameRate >= fps }
+
+/** Total pixel count of the format's video dimensions, used to pick the sharpest format. */
 @OptIn(ExperimentalForeignApi::class)
 private fun AVCaptureDeviceFormat.pixelCount(): Long =
     CMVideoFormatDescriptionGetDimensions(formatDescription).useContents {

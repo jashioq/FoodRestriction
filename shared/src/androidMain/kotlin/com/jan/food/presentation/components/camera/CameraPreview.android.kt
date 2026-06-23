@@ -15,6 +15,12 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,7 +31,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -41,7 +52,6 @@ import java.util.concurrent.TimeUnit
 actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
-    focusRequest: FocusRequest?,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -86,8 +96,8 @@ actual fun CameraPreview(
         }
     }
 
-    // Held so the focus effect can reach the PreviewView's metering factory and the bound camera,
-    // both of which are otherwise scoped to the AndroidView factory / provider listener.
+    // The PreviewView and the bound Camera are held outside the AndroidView factory so the tap
+    // handler can reach the metering-point factory and CameraControl.
     val previewView = remember {
         PreviewView(context).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
@@ -95,64 +105,101 @@ actual fun CameraPreview(
         }
     }
     val cameraHolder = remember { CameraHolder() }
+    var focusReticle by remember { mutableStateOf<FocusReticleState?>(null) }
 
     if (!hasPermission) return
 
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-            cameraProviderFuture.addListener({
-                val cameraProvider = cameraProviderFuture.get()
-
-                val preview = Preview.Builder()
-                    .setResolutionSelector(
-                        ResolutionSelector.Builder()
-                            .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
-                            .build(),
-                    )
-                    .build()
-                    .also { it.surfaceProvider = previewView.surfaceProvider }
-
-                val imageAnalysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                    .also { analysis ->
-                        analysis.setAnalyzer(
-                            analysisExecutor,
-                            BarcodeAnalyzer(scanner) { debouncer.onDetected(it) },
-                        )
-                    }
-
-                cameraProvider.unbindAll()
-                cameraHolder.camera = cameraProvider.bindToLifecycle(
-                    lifecycleOwner,
-                    CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview,
-                    imageAnalysis,
-                )
-            }, ContextCompat.getMainExecutor(ctx))
-
-            previewView
+    Box(
+        modifier = modifier.pointerInput(Unit) {
+            detectTapGestures { tap ->
+                focusAt(previewView, cameraHolder.camera, tap)
+                // tapCount keeps the reticle animation distinct per tap, even on the same spot.
+                focusReticle = FocusReticleState(tap, (focusReticle?.tapCount ?: 0L) + 1L)
+            }
         },
-    )
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+                cameraProviderFuture.addListener({
+                    val cameraProvider = cameraProviderFuture.get()
 
-    LaunchedEffect(focusRequest) {
-        val request = focusRequest ?: return@LaunchedEffect
-        val camera = cameraHolder.camera ?: return@LaunchedEffect
-        if (previewView.width == 0 || previewView.height == 0) return@LaunchedEffect
+                    val preview = Preview.Builder()
+                        .setResolutionSelector(
+                            ResolutionSelector.Builder()
+                                .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                                .build(),
+                        )
+                        .build()
+                        .also { it.surfaceProvider = previewView.surfaceProvider }
 
-        val point = previewView.meteringPointFactory.createPoint(
-            request.x * previewView.width,
-            request.y * previewView.height,
+                    val imageAnalysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { analysis ->
+                            analysis.setAnalyzer(
+                                analysisExecutor,
+                                BarcodeAnalyzer(scanner) { debouncer.onDetected(it) },
+                            )
+                        }
+
+                    cameraProvider.unbindAll()
+                    cameraHolder.camera = cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        preview,
+                        imageAnalysis,
+                    )
+                }, ContextCompat.getMainExecutor(context))
+
+                previewView
+            },
         )
-        val action = FocusMeteringAction.Builder(
-            point,
-            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE,
-        ).setAutoCancelDuration(AUTO_CANCEL_SECONDS, TimeUnit.SECONDS).build()
-        camera.cameraControl.startFocusAndMetering(action)
+
+        focusReticle?.let { FocusReticle(it) }
     }
 }
+
+/** Focuses (and meters exposure) on the tapped point of the [previewView]. */
+private fun focusAt(previewView: PreviewView, camera: Camera?, tap: Offset) {
+    if (camera == null || previewView.width == 0 || previewView.height == 0) return
+    // The tap is in the same pixel space as the PreviewView, which fills the gesture Box.
+    val point = previewView.meteringPointFactory.createPoint(tap.x, tap.y)
+    val action = FocusMeteringAction.Builder(
+        point,
+        FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE,
+    ).setAutoCancelDuration(AUTO_CANCEL_SECONDS, TimeUnit.SECONDS).build()
+    camera.cameraControl.startFocusAndMetering(action)
+}
+
+/** The tapped point plus a per-tap counter that restarts the reticle animation. */
+private data class FocusReticleState(val center: Offset, val tapCount: Long)
+
+/** White ring at the tapped point that fades in (150 ms) then out (150 ms) on each tap. */
+@Composable
+private fun FocusReticle(state: FocusReticleState) {
+    val alpha = remember { Animatable(0f) }
+    LaunchedEffect(state.tapCount) {
+        alpha.snapTo(0f)
+        alpha.animateTo(1f, tween(FADE_HALF_MILLIS))
+        alpha.animateTo(0f, tween(FADE_HALF_MILLIS))
+    }
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        drawCircle(
+            color = Color.White,
+            radius = RETICLE_DIAMETER.toPx() / 2f,
+            center = state.center,
+            alpha = alpha.value,
+            style = Stroke(width = RETICLE_STROKE.toPx()),
+        )
+    }
+}
+
+private val RETICLE_DIAMETER = 64.dp
+private val RETICLE_STROKE = 2.dp
+private const val FADE_HALF_MILLIS = 150
 
 /** How long CameraX keeps the manual focus before reverting to continuous auto-focus. */
 private const val AUTO_CANCEL_SECONDS = 3L

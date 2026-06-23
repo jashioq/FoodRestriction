@@ -17,7 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.button.CameraCaptureButton
 import com.jan.food.presentation.components.button.MenuButton
-import com.jan.food.presentation.components.camera.CameraView
+import com.jan.food.presentation.components.camera.CameraPreview
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -26,7 +26,7 @@ fun HomeScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    CameraView(
+    CameraPreview(
         modifier = Modifier.fillMaxSize(),
         onBarcodeScanned = { barcode ->
             viewModel.sendAction(HomeScreenAction.BarcodeDetected(barcode))
