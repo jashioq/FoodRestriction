@@ -216,7 +216,7 @@ private fun FocusReticle(state: FocusReticleState) {
 }
 
 /** Blur radius applied to the feed while it is used as a backdrop. */
-private val BlurRadius = 40.dp
+private val BlurRadius = 80.dp
 
 private val RETICLE_DIAMETER = 64.dp
 private val RETICLE_STROKE = 2.dp

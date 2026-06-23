@@ -113,8 +113,10 @@ private class CameraContainerView(
     private val previewLayer: AVCaptureVideoPreviewLayer,
 ) : UIView(frame = CGRectZero.readValue()) {
 
+    // iOS's public blur API has no numeric radius like Android's 80.dp; this lighter system
+    // material gives a softer, more translucent backdrop blur.
     private val blurView = UIVisualEffectView(
-        effect = UIBlurEffect.effectWithStyle(UIBlurEffectStyle.UIBlurEffectStyleRegular),
+        effect = UIBlurEffect.effectWithStyle(UIBlurEffectStyle.UIBlurEffectStyleSystemThinMaterial),
     ).apply { alpha = 0.0 }
 
     init {
