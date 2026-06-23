@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
  *
  * @param blurred when true, the feed animates to a blurred state; when false, back to sharp.
  * @param modifier the [Modifier] applied to the background container.
+ * @param tapToFocusEnabled when true, tapping the feed triggers tap-to-focus (Android only); when
+ * false, taps are ignored and no focus reticle is drawn.
  * @param content the foreground drawn over the feed, given the latest scanned barcode (or `null`
  * once none has been visible for a few seconds).
  */
@@ -26,6 +28,7 @@ import androidx.compose.ui.Modifier
 fun CameraBackground(
     blurred: Boolean,
     modifier: Modifier = Modifier,
+    tapToFocusEnabled: Boolean = true,
     content: @Composable (barcode: String?) -> Unit,
 ) {
     var latestBarcode by remember { mutableStateOf<String?>(null) }
@@ -35,6 +38,7 @@ fun CameraBackground(
             modifier = Modifier.fillMaxSize(),
             onBarcodeScanned = { barcode -> latestBarcode = barcode },
             blurred = blurred,
+            tapToFocusEnabled = tapToFocusEnabled,
         )
 
         content(latestBarcode)

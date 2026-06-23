@@ -66,6 +66,8 @@ actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
     blurred: Boolean,
+    // iOS has no tap interaction (automatic macro lens + continuous autofocus), so this is unused.
+    tapToFocusEnabled: Boolean,
 ) {
     val session = remember { AVCaptureSession() }
     val previewLayer = remember { AVCaptureVideoPreviewLayer(session = session) }

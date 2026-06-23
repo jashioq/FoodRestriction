@@ -8,6 +8,7 @@ actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
     blurred: Boolean,
+    tapToFocusEnabled: Boolean,
 ) {
     TODO("JVM/Desktop is hot-reload only; camera preview is not wired for this target.")
 }

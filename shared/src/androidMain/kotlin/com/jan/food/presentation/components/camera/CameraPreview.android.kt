@@ -56,6 +56,7 @@ actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
     blurred: Boolean,
+    tapToFocusEnabled: Boolean,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -119,15 +120,20 @@ actual fun CameraPreview(
         label = "cameraBlur",
     )
 
-    Box(
-        modifier = modifier.pointerInput(Unit) {
+    // Re-keyed on tapToFocusEnabled so the tap handler is torn down when focusing is disabled.
+    val tapModifier = if (tapToFocusEnabled) {
+        Modifier.pointerInput(Unit) {
             detectTapGestures { tap ->
                 focusAt(previewView, cameraHolder.camera, tap)
                 // tapCount keeps the reticle animation distinct per tap, even on the same spot.
                 focusReticle = FocusReticleState(tap, (focusReticle?.tapCount ?: 0L) + 1L)
             }
-        },
-    ) {
+        }
+    } else {
+        Modifier
+    }
+
+    Box(modifier = modifier.then(tapModifier)) {
         AndroidView(
             modifier = Modifier
                 .fillMaxSize()

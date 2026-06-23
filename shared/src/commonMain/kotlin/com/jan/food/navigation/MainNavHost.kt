@@ -27,7 +27,8 @@ fun MainNavHost() {
     // same color, tapping one carries its animation straight into the other across the cross-fade.
     val navButtonPulse = rememberTapPulseState()
 
-    CameraBackground(blurred = onMenu) { barcode ->
+    // Tap-to-focus only on the home screen; the menu uses the feed as a static blurred backdrop.
+    CameraBackground(blurred = onMenu, tapToFocusEnabled = !onMenu) { barcode ->
         NavHost(
             navController = navController,
             startDestination = HomeScreenDestination,
