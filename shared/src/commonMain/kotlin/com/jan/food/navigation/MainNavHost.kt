@@ -1,5 +1,6 @@
 package com.jan.food.navigation
 
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
@@ -30,11 +31,10 @@ fun MainNavHost() {
         NavHost(
             navController = navController,
             startDestination = HomeScreenDestination,
-            // Cross-fade the (transparent) screen content over the shared camera background.
-            enterTransition = { fadeIn() },
-            exitTransition = { fadeOut() },
-            popEnterTransition = { fadeIn() },
-            popExitTransition = { fadeOut() },
+            enterTransition = { fadeIn(tween(FADE_MILLIS)) },
+            exitTransition = { fadeOut(tween(FADE_MILLIS)) },
+            popEnterTransition = { fadeIn(tween(FADE_MILLIS)) },
+            popExitTransition = { fadeOut(tween(FADE_MILLIS)) },
         ) {
             composable<HomeScreenDestination> {
                 HomeScreen(
@@ -53,3 +53,5 @@ fun MainNavHost() {
         }
     }
 }
+
+private const val FADE_MILLIS = 300
