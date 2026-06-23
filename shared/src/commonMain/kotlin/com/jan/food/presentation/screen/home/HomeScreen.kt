@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -17,22 +18,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.button.CameraCaptureButton
 import com.jan.food.presentation.components.button.MenuButton
-import com.jan.food.presentation.components.camera.CameraPreview
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun HomeScreen(
+    barcode: String?,
     onMenuClick: () -> Unit,
     viewModel: HomeScreenViewModel = koinViewModel()
 ) {
     val state by viewModel.state.collectAsState()
 
-    CameraPreview(
-        modifier = Modifier.fillMaxSize(),
-        onBarcodeScanned = { barcode ->
-            viewModel.sendAction(HomeScreenAction.BarcodeDetected(barcode))
-        },
-    )
+    // The camera feed is shared and hosted by the NavHost; forward its scans into the view model.
+    LaunchedEffect(barcode) {
+        viewModel.sendAction(HomeScreenAction.BarcodeDetected(barcode))
+    }
 
     Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
         Column(

@@ -9,17 +9,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.BlurredEdgeTreatment
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.button.BackButton
-import com.jan.food.presentation.components.camera.CameraPreview
 import org.koin.compose.viewmodel.koinViewModel
 
 /**
- * Full-screen menu overlay: a heavily blurred live [CameraPreview] background dimmed by a
- * translucent white scrim, with a [BackButton] in the same position as the home screen's menu
+ * Full-screen menu overlay drawn on top of the shared, blurred camera feed hosted by the NavHost:
+ * a translucent white scrim with a [BackButton] in the same position as the home screen's menu
  * button. Reached via a fade transition from the home screen.
  *
  * @param onBackClick invoked when the back button is tapped.
@@ -30,12 +27,6 @@ fun MenuScreen(
     onBackClick: () -> Unit,
     viewModel: MenuScreenViewModel = koinViewModel(),
 ) {
-    CameraPreview(
-        modifier = Modifier
-            .fillMaxSize()
-            .blur(40.dp, BlurredEdgeTreatment.Rectangle),
-    )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
