@@ -16,7 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.jan.food.presentation.components.button.CameraCaptureButton
+import com.jan.food.presentation.components.button.CircleActionButton
 import com.jan.food.presentation.components.button.MenuButton
 import com.jan.food.presentation.components.button.TapPulseState
 import org.koin.compose.viewmodel.koinViewModel
@@ -85,7 +85,7 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp),
         )
 
-        CameraCaptureButton(
+        CircleActionButton(
             onClick = {
                 viewModel.sendAction(HomeScreenAction.CheckProduct)
             },
@@ -93,6 +93,6 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 32.dp),
-        )
+        ) {}
     }
 }

@@ -55,9 +55,9 @@ fun BlurCircleButton(
     blurColor: Color = Color.Black,
     blurColorAlpha: Float = 0.4f,
     blurFadeSize: Dp = 12.dp,
-    tapColor: Color = Color.White,
+    tapColor: Color = Color.LightGray,
     tapColorAlpha: Float = 0.4f,
-    tapAnimationMillis: Int = 350,
+    tapAnimationMillis: Int = 500,
     pulse: TapPulseState? = null,
     content: @Composable () -> Unit,
 ) {

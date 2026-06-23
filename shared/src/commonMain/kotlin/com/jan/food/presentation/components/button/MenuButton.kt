@@ -40,7 +40,6 @@ fun MenuButton(
     }
 }
 
-/** Hamburger ("menu") icon, built as an [ImageVector] to avoid the material-icons dependency. */
 private val MenuIcon: ImageVector by lazy {
     ImageVector.Builder(
         name = "Menu",
