@@ -1,10 +1,9 @@
 package com.jan.food.presentation.components.grid
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -19,15 +18,51 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sqrt
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
+/** Rows of cell content for [ReactiveGrid]; a `null` entry leaves a gap. Rows may differ in length. */
+typealias ReactiveGridContent = List<List<(@Composable () -> Unit)?>>
+
+/**
+ * The tunable "magnet" feel of a [ReactiveGrid] tap: how far neighbours shove, how the push decays
+ * and staggers outward, how much the tapped cell swells, and the spring that drives it all (speed +
+ * bounce). The defaults are the shipped feel; override only what you want to change.
+ *
+ * @property pushStrength how far a directly-adjacent (ring 1) cell shoves away at the peak; outer
+ * rings shove [falloff]^(ring-1) as far.
+ * @property falloff per-ring multiplier applied to [pushStrength] (`0f`..`1f`); smaller decays faster.
+ * @property pressScale how much the tapped cell grows at the peak (e.g. `0.3f` = +30%).
+ * @property ringDelay how long each successive ring waits before it reacts, creating the
+ * travelling-wave look.
+ * @property pushStiffness spring stiffness for the neighbour push; higher is quicker.
+ * @property pushDamping spring damping ratio for the neighbour push; lower bounces more.
+ * @property swellStiffness spring stiffness for the tapped cell's swell; higher is quicker.
+ * @property swellDamping spring damping ratio for the tapped cell's swell; lower bounces more.
+ */
+data class ReactiveGridAnimation(
+    val pushStrength: Dp = 18.dp,
+    val falloff: Float = 0.5f,
+    val pressScale: Float = 0.3f,
+    val ringDelay: Duration = 45.milliseconds,
+    val pushStiffness: Float = 300f,
+    val pushDamping: Float = 0.3f,
+    val swellStiffness: Float = 350f,
+    val swellDamping: Float = 0.35f,
+)
 
 /**
  * A grid that renders a 2-D list of composables as rows and columns and reacts to a tap with a
@@ -45,24 +80,16 @@ import kotlin.math.sqrt
  * @param modifier the [Modifier] applied to the grid.
  * @param horizontalSpacing the gap between columns at rest.
  * @param verticalSpacing the gap between rows at rest.
- * @param pushStrength how far a directly-adjacent (ring 1) cell shoves away at the peak of the
- * animation; outer rings shove [falloff]^(ring-1) as far.
- * @param falloff per-ring multiplier applied to [pushStrength] (`0f`..`1f`); smaller decays faster.
- * @param pressScale how much the tapped cell grows at the peak (e.g. `0.15f` = +15%).
- * @param ringDelayMillis how long each successive ring waits before it reacts, creating the
- * travelling-wave look.
+ * @param animation the magnet-ripple feel; see [ReactiveGridAnimation].
  */
 @Composable
 fun ReactiveGrid(
-    items: List<List<(@Composable () -> Unit)?>>,
+    items: ReactiveGridContent,
     onItemClick: (row: Int, column: Int) -> Unit,
     modifier: Modifier = Modifier,
     horizontalSpacing: Dp = 16.dp,
     verticalSpacing: Dp = 16.dp,
-    pushStrength: Dp = 18.dp,
-    falloff: Float = 0.5f,
-    pressScale: Float = 0.15f,
-    ringDelayMillis: Int = 45,
+    animation: ReactiveGridAnimation = ReactiveGridAnimation(),
 ) {
     // The tapped cell plus a monotonically increasing id so re-tapping the same cell re-triggers.
     var pressedRow by remember { mutableStateOf(-1) }
@@ -87,10 +114,7 @@ fun ReactiveGrid(
                             pressedRow = pressedRow,
                             pressedCol = pressedCol,
                             pressId = pressId,
-                            pushStrength = pushStrength,
-                            falloff = falloff,
-                            pressScale = pressScale,
-                            ringDelayMillis = ringDelayMillis,
+                            animation = animation,
                             onClick = {
                                 pressedRow = row
                                 pressedCol = column
@@ -107,8 +131,12 @@ fun ReactiveGrid(
 }
 
 /**
- * A single cell of [ReactiveGrid]. Owns its own `0 → 1 → 0` push [Animatable] and replays it on
- * every [pressId] change, after a ring-distance delay so outer rings trail inner ones.
+ * A single cell of [ReactiveGrid], modelled as a spring-loaded mass anchored at its home position
+ * (and home scale `1`). A tap doesn't move the cell to a target and back — it injects an outward
+ * *impulse* (a velocity kick) and lets a single under-damped spring carry the cell out and straight
+ * back home in one continuous motion, so there's no dwell at the peak. Since the kick is *added* to
+ * the cell's current velocity and `animateTo` resumes from its current value, overlapping taps
+ * accumulate like real impulses rather than snapping.
  */
 @Composable
 private fun ReactiveGridCell(
@@ -117,14 +145,13 @@ private fun ReactiveGridCell(
     pressedRow: Int,
     pressedCol: Int,
     pressId: Int,
-    pushStrength: Dp,
-    falloff: Float,
-    pressScale: Float,
-    ringDelayMillis: Int,
+    animation: ReactiveGridAnimation,
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val push = remember { Animatable(0f) }
+    val translation = remember { Animatable(Offset.Zero, Offset.VectorConverter) }
+    val scale = remember { Animatable(1f) }
+    val density = LocalDensity.current
     val isPressed = row == pressedRow && column == pressedCol
 
     // Radial direction away from the tapped cell (euclidean) for a natural push...
@@ -136,15 +163,37 @@ private fun ReactiveGridCell(
 
     // ...but concentric (chebyshev) rings for the strength tier and the stagger delay.
     val ring = max(abs(row - pressedRow), abs(column - pressedCol))
-    val magnitude = pushStrength * falloff.pow((ring - 1).coerceAtLeast(0))
+    val magnitude = animation.pushStrength * animation.falloff.pow((ring - 1).coerceAtLeast(0))
+
+    // Springs anchored at home, derived from the config. The kick is scaled by sqrt(stiffness) so an
+    // impulse's peak (≈ velocity / sqrt(stiffness)) tracks the intended push distance / swell.
+    val translationSpec = spring<Offset>(animation.pushDamping, animation.pushStiffness)
+    val scaleSpec = spring<Float>(animation.swellDamping, animation.swellStiffness)
+    val pushVelocityFactor = sqrt(animation.pushStiffness)
+    val swellVelocityFactor = sqrt(animation.swellStiffness)
 
     LaunchedEffect(pressId) {
         if (pressId == 0) return@LaunchedEffect // No tap yet.
-        delay(ring.toLong() * ringDelayMillis)
-        push.snapTo(0f)
-        push.animateTo(1f, tween(durationMillis = 140, easing = FastOutSlowInEasing))
-        // A springy return gives the cells their magnet-like rebound back into place.
-        push.animateTo(0f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessLow))
+        coroutineScope {
+            // Scale: kick the tapped cell upward; the spring carries it up and back to size 1 in
+            // one motion. Neighbours just spring whatever residual scale they have back to rest.
+            launch {
+                val kick = if (isPressed) animation.pressScale * swellVelocityFactor else 0f
+                scale.animateTo(1f, scaleSpec, initialVelocity = scale.velocity + kick)
+            }
+            // Translation: neighbours get an outward velocity kick (after their ring delay) and the
+            // spring carries them out and straight back home. The tapped cell stays put.
+            launch {
+                val kick = if (isPressed) {
+                    Offset.Zero
+                } else {
+                    delay(animation.ringDelay * ring)
+                    val magnitudePx = with(density) { magnitude.toPx() }
+                    Offset(dirX, dirY) * (magnitudePx * pushVelocityFactor)
+                }
+                translation.animateTo(Offset.Zero, translationSpec, initialVelocity = translation.velocity + kick)
+            }
+        }
     }
 
     Box(
@@ -152,15 +201,10 @@ private fun ReactiveGridCell(
             // Keep the growing tapped cell above its retreating neighbours.
             .zIndex(if (isPressed) 1f else 0f)
             .graphicsLayer {
-                val p = push.value
-                if (isPressed) {
-                    val scale = 1f + pressScale * p
-                    scaleX = scale
-                    scaleY = scale
-                } else {
-                    translationX = dirX * magnitude.toPx() * p
-                    translationY = dirY * magnitude.toPx() * p
-                }
+                translationX = translation.value.x
+                translationY = translation.value.y
+                scaleX = scale.value
+                scaleY = scale.value
             }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
