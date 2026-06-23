@@ -41,14 +41,14 @@ fun CircleActionButton(
             .size(size)
             .shadow(elevation = 8.dp, shape = CircleShape, clip = false)
             .clip(CircleShape)
-            .background(LightGray)
-            .border(width = BorderWidth, color = Color.White, shape = CircleShape)
+            .background(Color.White)
+            .border(width = BorderWidth, color = LightGray, shape = CircleShape)
             .clickable(enabled = !isLoading, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (isLoading) {
             CircularProgressIndicator(
-                color = Color.White,
+                color = LightGray,
                 strokeWidth = 10.dp,
                 modifier = Modifier.size(size - BorderWidth * 3),
             )
