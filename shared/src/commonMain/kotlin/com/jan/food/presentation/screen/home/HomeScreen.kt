@@ -3,6 +3,7 @@ package com.jan.food.presentation.screen.home
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -35,7 +36,7 @@ fun HomeScreen(
         viewModel.sendAction(HomeScreenAction.BarcodeDetected(barcode))
     }
 
-    Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
+    Box(modifier = Modifier.fillMaxSize().displayCutoutPadding()) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,

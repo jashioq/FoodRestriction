@@ -2,6 +2,7 @@ package com.jan.food.presentation.screen.menu
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -56,7 +57,7 @@ fun MenuScreen(
             .background(Color.White.copy(alpha = 0.5f)),
     )
 
-    Box(modifier = Modifier.fillMaxSize().systemBarsPadding()) {
+    Box(modifier = Modifier.fillMaxSize().displayCutoutPadding()) {
         BackButton(
             onClick = onBackClick,
             // Shared with the home menu button so the two pulse in sync across navigation.

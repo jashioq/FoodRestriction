@@ -6,5 +6,9 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>This app uses the camera to scan food products.</string>
+	<key>UIStatusBarHidden</key>
+	<true/>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
 </dict>
 </plist>
