@@ -50,7 +50,10 @@ import platform.CoreMedia.CMTimeMake
 import platform.CoreMedia.CMVideoFormatDescriptionGetDimensions
 import platform.QuartzCore.CATransaction
 import platform.QuartzCore.kCATransactionDisableActions
+import platform.UIKit.UIBlurEffect
+import platform.UIKit.UIBlurEffectStyle
 import platform.UIKit.UIView
+import platform.UIKit.UIVisualEffectView
 import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
 import platform.darwin.NSObject
 import platform.darwin.dispatch_async
@@ -62,6 +65,7 @@ import platform.darwin.dispatch_get_main_queue
 actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
+    blurred: Boolean,
 ) {
     val session = remember { AVCaptureSession() }
     val previewLayer = remember { AVCaptureVideoPreviewLayer(session = session) }
@@ -90,20 +94,31 @@ actual fun CameraPreview(
 
     UIKitView(
         factory = { CameraContainerView(previewLayer) },
+        // Compose's blur can't reach the native preview layer, so blur natively over it instead.
+        update = { view -> view.setBlurred(blurred) },
         modifier = modifier,
         // A passive display surface with no touch handling of its own.
         properties = UIKitInteropProperties(interactionMode = null),
     )
 }
 
-/** [UIView] that keeps the capture preview layer sized to its bounds across layout passes. */
+/**
+ * [UIView] that keeps the capture preview layer sized to its bounds across layout passes and hosts
+ * a native blur overlay ([UIVisualEffectView]) that fades in over the feed when used as a backdrop.
+ */
 @OptIn(ExperimentalForeignApi::class)
 private class CameraContainerView(
     private val previewLayer: AVCaptureVideoPreviewLayer,
 ) : UIView(frame = CGRectZero.readValue()) {
 
+    private val blurView = UIVisualEffectView(
+        effect = UIBlurEffect.effectWithStyle(UIBlurEffectStyle.UIBlurEffectStyleRegular),
+    ).apply { alpha = 0.0 }
+
     init {
         layer.addSublayer(previewLayer)
+        // Added as a subview so it composites above the preview layer.
+        addSubview(blurView)
     }
 
     override fun layoutSubviews() {
@@ -112,9 +127,20 @@ private class CameraContainerView(
         CATransaction.begin()
         CATransaction.setValue(true, kCATransactionDisableActions)
         previewLayer.setFrame(bounds)
+        blurView.setFrame(bounds)
         CATransaction.commit()
     }
+
+    /** Fades the blur overlay in (true) or out (false) to match the requested backdrop state. */
+    fun setBlurred(blurred: Boolean) {
+        val target = if (blurred) 1.0 else 0.0
+        if (blurView.alpha == target) return
+        UIView.animateWithDuration(BLUR_FADE_SECONDS) { blurView.alpha = target }
+    }
 }
+
+/** Duration of the blur fade-in/out, matching the screen's fade transition. */
+private const val BLUR_FADE_SECONDS = 0.3
 
 /** Receives decoded machine-readable codes from the capture session on the main queue. */
 @OptIn(ExperimentalForeignApi::class)

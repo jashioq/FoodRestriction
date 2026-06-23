@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
+    blurred: Boolean,
 ) {
     TODO("JVM/Desktop is hot-reload only; camera preview is not wired for this target.")
 }

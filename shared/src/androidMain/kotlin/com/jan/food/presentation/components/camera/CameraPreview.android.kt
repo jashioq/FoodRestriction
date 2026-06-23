@@ -16,6 +16,7 @@ import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -33,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -52,6 +55,7 @@ import java.util.concurrent.TimeUnit
 actual fun CameraPreview(
     modifier: Modifier,
     onBarcodeScanned: (String?) -> Unit,
+    blurred: Boolean,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -109,6 +113,12 @@ actual fun CameraPreview(
 
     if (!hasPermission) return
 
+    // Compose's blur works over the TextureView-backed PreviewView, so blur here natively.
+    val blurRadius by animateDpAsState(
+        targetValue = if (blurred) BlurRadius else 0.dp,
+        label = "cameraBlur",
+    )
+
     Box(
         modifier = modifier.pointerInput(Unit) {
             detectTapGestures { tap ->
@@ -119,7 +129,9 @@ actual fun CameraPreview(
         },
     ) {
         AndroidView(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(blurRadius, BlurredEdgeTreatment.Rectangle),
             factory = {
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                 cameraProviderFuture.addListener({
@@ -196,6 +208,9 @@ private fun FocusReticle(state: FocusReticleState) {
         )
     }
 }
+
+/** Blur radius applied to the feed while it is used as a backdrop. */
+private val BlurRadius = 40.dp
 
 private val RETICLE_DIAMETER = 64.dp
 private val RETICLE_STROKE = 2.dp
