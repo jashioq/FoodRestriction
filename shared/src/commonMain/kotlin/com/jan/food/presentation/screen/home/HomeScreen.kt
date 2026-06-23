@@ -22,6 +22,7 @@ import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
 fun HomeScreen(
+    onMenuClick: () -> Unit,
     viewModel: HomeScreenViewModel = koinViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -75,7 +76,7 @@ fun HomeScreen(
         }
 
         MenuButton(
-            onClick = { /* No navigation yet. */ },
+            onClick = onMenuClick,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(horizontal = 16.dp),

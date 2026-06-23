@@ -9,6 +9,7 @@ import com.jan.food.domain.useCase.LogoutUseCase
 import com.jan.food.domain.useCase.SetOnboardingFinishedUseCase
 import com.jan.food.navigation.NavigationViewModel
 import com.jan.food.presentation.screen.home.HomeScreenViewModel
+import com.jan.food.presentation.screen.menu.MenuScreenViewModel
 import com.jan.food.presentation.screen.onboarding.OnboardingScreenViewModel
 import org.koin.dsl.module
 
@@ -33,5 +34,9 @@ val presentationModule = module {
             checkProductUseCase = get<CheckProductUseCase>(),
             emitSelectedAllergensUseCase = get<EmitSelectedAllergensUseCase>(),
         )
+    }
+
+    factory {
+        MenuScreenViewModel()
     }
 }
