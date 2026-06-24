@@ -16,14 +16,18 @@ import kotlinx.coroutines.launch
  * Selection is replace-based: a tap reads the current set, flips the tapped allergen, and saves the
  * whole list back via [saveSelectedAllergensUseCase]. The state is never mutated directly — it is
  * refreshed from [emitSelectedAllergensUseCase], the single source of truth.
+ *
+ * [initialSelected] seeds the state from the navigation argument so the pills open already in their
+ * selected state, avoiding a visible flick when the first use-case emission arrives a few frames later.
  */
 class MenuScreenViewModel(
+    initialSelected: Set<Allergen>,
     private val emitSelectedAllergensUseCase: UseCase<Unit, Flow<List<Allergen>>>,
     private val saveSelectedAllergensUseCase: UseCase<List<Allergen>, Unit>,
     scope: CoroutineScope? = null,
     logger: Logger? = null,
 ) : CoreViewModel<MenuScreenState, MenuScreenAction>(
-    initialState = MenuScreenState(),
+    initialState = MenuScreenState(selectedAllergens = initialSelected),
     scope = scope,
     logger = logger,
 ) {

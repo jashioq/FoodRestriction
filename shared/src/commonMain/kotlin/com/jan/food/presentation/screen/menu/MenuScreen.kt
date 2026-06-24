@@ -20,6 +20,7 @@ import com.jan.food.presentation.components.button.TapPulseState
 import com.jan.food.presentation.components.grid.ReactiveGrid
 import com.jan.food.presentation.components.pill.Pill
 import org.koin.compose.viewmodel.koinViewModel
+import org.koin.core.parameter.parametersOf
 
 /**
  * The 14 allergens arranged as a diamond (`2-3-4-3-2`): short top/bottom rows, the widest row in
@@ -44,14 +45,19 @@ private fun Allergen.label(): String =
  * a translucent white scrim with a [BackButton] in the same position as the home screen's menu
  * button. Reached via a fade transition from the home screen.
  *
+ * @param initialSelectedTags allergen tags already selected when the screen opens; seeds the pills'
+ * state so they don't flick on after the first use-case emission.
  * @param onBackClick invoked when the back button is tapped.
  * @param viewModel the screen's [MenuScreenViewModel].
  */
 @Composable
 fun MenuScreen(
+    initialSelectedTags: List<String>,
     onBackClick: () -> Unit,
     backButtonPulse: TapPulseState? = null,
-    viewModel: MenuScreenViewModel = koinViewModel(),
+    viewModel: MenuScreenViewModel = koinViewModel {
+        parametersOf(initialSelectedTags.mapNotNull(Allergen::fromTag).toSet())
+    },
 ) {
     val state by viewModel.state.collectAsState()
 

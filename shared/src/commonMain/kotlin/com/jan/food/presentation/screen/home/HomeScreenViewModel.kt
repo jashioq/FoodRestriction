@@ -29,15 +29,13 @@ class HomeScreenViewModel(
         session = null,
         productCheck = null,
         isLoading = false,
+        selectedAllergens = emptyList(),
     ),
     scope = scope,
     logger = logger,
 ) {
     /** Most recently scanned barcode, or null when nothing is in view. Updated only from [process]. */
     private var latestBarcode: String? = null
-
-    /** Most recently emitted allergen selection, sent with the next check. Updated only from [init]. */
-    private var latestAllergens: List<Allergen> = emptyList()
 
     init {
         vmScope.launch {
@@ -58,7 +56,9 @@ class HomeScreenViewModel(
             emitSelectedAllergensUseCase.call(Unit)
                 .onSuccess { allergens ->
                     allergens.collect { selection ->
-                        latestAllergens = selection
+                        stateFlow.update { state ->
+                            state.copy(selectedAllergens = selection)
+                        }
                     }
                 }
         }
@@ -98,7 +98,7 @@ class HomeScreenViewModel(
                     checkProductUseCase.call(
                         CheckProductParams(
                             barcode = barcode,
-                            restrictions = latestAllergens.map { it.tag },
+                            restrictions = stateFlow.value.selectedAllergens.map { it.tag },
                         ),
                     ).onSuccess { productCheck ->
                         stateFlow.update { state ->

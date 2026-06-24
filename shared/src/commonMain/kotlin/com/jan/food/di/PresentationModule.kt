@@ -37,8 +37,9 @@ val presentationModule = module {
         )
     }
 
-    factory {
+    factory { params ->
         MenuScreenViewModel(
+            initialSelected = params.get(),
             emitSelectedAllergensUseCase = get<EmitSelectedAllergensUseCase>(),
             saveSelectedAllergensUseCase = get<SaveSelectedAllergensUseCase>(),
         )

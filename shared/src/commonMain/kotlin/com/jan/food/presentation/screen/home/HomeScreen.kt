@@ -25,7 +25,7 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun HomeScreen(
     barcode: String?,
-    onMenuClick: () -> Unit,
+    onMenuClick: (selectedAllergenTags: List<String>) -> Unit,
     menuButtonPulse: TapPulseState? = null,
     viewModel: HomeScreenViewModel = koinViewModel()
 ) {
@@ -78,7 +78,7 @@ fun HomeScreen(
         }
 
         MenuButton(
-            onClick = onMenuClick,
+            onClick = { onMenuClick(state.selectedAllergens.map { it.tag }) },
             // Shared with the menu's back button so the two pulse in sync across navigation.
             pulse = menuButtonPulse,
             modifier = Modifier

@@ -10,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.jan.food.presentation.components.button.rememberTapPulseState
 import com.jan.food.presentation.components.camera.CameraBackground
 import com.jan.food.presentation.screen.home.HomeScreen
@@ -40,13 +41,14 @@ fun MainNavHost() {
             composable<HomeScreenDestination> {
                 HomeScreen(
                     barcode = barcode,
-                    onMenuClick = { navController.navigate(MenuScreenDestination) },
+                    onMenuClick = { tags -> navController.navigate(MenuScreenDestination(tags)) },
                     menuButtonPulse = navButtonPulse,
                 )
             }
 
-            composable<MenuScreenDestination> {
+            composable<MenuScreenDestination> { entry ->
                 MenuScreen(
+                    initialSelectedTags = entry.toRoute<MenuScreenDestination>().selectedAllergenTags,
                     onBackClick = { navController.popBackStack() },
                     backButtonPulse = navButtonPulse,
                 )
