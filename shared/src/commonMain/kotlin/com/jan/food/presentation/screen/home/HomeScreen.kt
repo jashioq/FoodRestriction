@@ -57,6 +57,10 @@ fun HomeScreen(
     val offsetFraction = rememberCameraFeedOffsetFraction()
     val showingResults = state.productCheck != null && !state.isLoading
 
+    fun guardClick(onClick: () -> Unit) {
+        if (offsetFraction == 0F) onClick()
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize().displayCutoutPadding()) {
         val slide = maxHeight * offsetFraction
 
@@ -144,7 +148,7 @@ fun HomeScreen(
                 modifier = Modifier.align(Alignment.TopStart),
             ) {
                 MenuButton(
-                    onClick = { onMenuClick(state.selectedAllergens.map { it.tag }) },
+                    onClick = { guardClick { onMenuClick(state.selectedAllergens.map { it.tag }) } },
                     // Shared with the menu's back button so the two pulse in sync across navigation.
                     pulse = menuButtonPulse,
                     modifier = Modifier.padding(horizontal = 16.dp),
@@ -152,7 +156,7 @@ fun HomeScreen(
             }
 
             CircleActionButton(
-                onClick = { viewModel.sendAction(HomeScreenAction.CheckProduct) },
+                onClick = { guardClick { viewModel.sendAction(HomeScreenAction.CheckProduct) } },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 32.dp),
@@ -171,4 +175,4 @@ fun HomeScreen(
     }
 }
 
-private const val MENU_FADE_MILLIS = 300
+private const val MENU_FADE_MILLIS = 500

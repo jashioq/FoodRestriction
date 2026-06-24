@@ -20,10 +20,11 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/** Top-corner radius the feed rounds to when slid down, approximating the device screen curvature. */
-private val FeedCornerRadius = 44.dp
+/** Fallback top-corner radius when the device's screen curvature can't be read (see [rememberDeviceCornerRadius]). */
+private val DefaultFeedCornerRadius = 45.dp
 
 /** Blur radius of the custom drop shadow drawn behind the feed. */
 private val FeedShadowBlur = 28.dp
@@ -56,6 +57,11 @@ fun CameraBackground(
     var latestBarcode by remember { mutableStateOf<String?>(null) }
     val controller = remember { CameraFeedController() }
 
+    // Match the slid-down feed's corners to the device screen curvature, falling back to a default
+    // where the platform can't report it.
+    val deviceCorner = rememberDeviceCornerRadius()
+    val feedCornerRadius = if (deviceCorner != Dp.Unspecified) deviceCorner else DefaultFeedCornerRadius
+
     // Same target + same spec as rememberCameraFeedOffsetFraction(), so the feed and any
     // feed-attached screen content animate frame-for-frame in sync.
     val offsetFraction by animateFloatAsState(
@@ -63,7 +69,7 @@ fun CameraBackground(
         animationSpec = tween(CameraFeedSlideMillis, easing = CameraFeedSlideEasing),
     )
     val cornerRadius by animateDpAsState(
-        targetValue = if (controller.anchor == CameraFeedAnchor.FULL) 0.dp else FeedCornerRadius,
+        targetValue = if (controller.anchor == CameraFeedAnchor.FULL) 0.dp else feedCornerRadius,
         animationSpec = tween(CameraFeedSlideMillis, easing = CameraFeedSlideEasing),
     )
     val darkenAlpha by animateFloatAsState(
