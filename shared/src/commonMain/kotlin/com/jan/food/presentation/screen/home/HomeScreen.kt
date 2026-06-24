@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,6 +34,8 @@ import com.jan.food.presentation.components.button.TapPulseState
 import com.jan.food.presentation.components.camera.CameraFeedAnchor
 import com.jan.food.presentation.components.camera.CameraFeedEffect
 import com.jan.food.presentation.components.camera.rememberCameraFeedOffsetFraction
+import com.jan.food.presentation.screen.home.view.HomeLoadingView
+import com.jan.food.presentation.screen.home.view.HomeResultsView
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -71,8 +72,8 @@ fun HomeScreen(
             contentAlignment = Alignment.Center,
         ) {
             when (anchor) {
-                CameraFeedAnchor.REVEAL_QUARTER -> Text("loading")
-                CameraFeedAnchor.REVEAL_THREE_QUARTERS -> Text("results")
+                CameraFeedAnchor.REVEAL_QUARTER -> HomeLoadingView()
+                CameraFeedAnchor.REVEAL_THREE_QUARTERS -> HomeResultsView()
                 CameraFeedAnchor.FULL -> {}
             }
         }
