@@ -49,7 +49,7 @@ fun MainNavHost() {
             composable<MenuScreenDestination> { entry ->
                 MenuScreen(
                     initialSelectedTags = entry.toRoute<MenuScreenDestination>().selectedAllergenTags,
-                    onBackClick = { navController.popBackStack() },
+                    onBackClick = { navController.popBackStack(HomeScreenDestination, inclusive = false) },
                     backButtonPulse = navButtonPulse,
                 )
             }
