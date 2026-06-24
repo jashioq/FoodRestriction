@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -61,7 +62,7 @@ fun HomeScreen(
         if (offsetFraction == 0F) onClick()
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize().displayCutoutPadding()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val slide = maxHeight * offsetFraction
 
         // Placeholder panel in the revealed area above the feed (drawn over the white backdrop).
@@ -133,7 +134,7 @@ fun HomeScreen(
             ) {
                 Box(
                     modifier = Modifier
-                        .padding(top = 12.dp)
+                        .padding(24.dp)
                         .size(width = 60.dp, height = 5.dp)
                         .clip(RoundedCornerShape(percent = 50))
                         .background(Color.White.copy(alpha = 0.8f)),
@@ -151,7 +152,9 @@ fun HomeScreen(
                     onClick = { guardClick { onMenuClick(state.selectedAllergens.map { it.tag }) } },
                     // Shared with the menu's back button so the two pulse in sync across navigation.
                     pulse = menuButtonPulse,
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    modifier = Modifier
+                        .displayCutoutPadding()
+                        .padding(horizontal = 16.dp),
                 )
             }
 
