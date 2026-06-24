@@ -99,9 +99,6 @@ fun CameraFeedEffect(
     LaunchedEffect(anchor, blurred, tapToFocus, darken) {
         controller.apply(anchor, blurred, tapToFocus, darken)
     }
-    DisposableEffect(Unit) {
-        onDispose { controller.reset() }
-    }
 }
 
 /**
