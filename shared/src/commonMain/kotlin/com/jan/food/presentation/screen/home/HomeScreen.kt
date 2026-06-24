@@ -31,7 +31,7 @@ import com.jan.food.presentation.components.button.CircleActionButton
 import com.jan.food.presentation.components.button.MenuButton
 import com.jan.food.presentation.components.button.TapPulseState
 import com.jan.food.presentation.components.camera.CameraFeedAnchor
-import com.jan.food.presentation.components.camera.CameraFeedAnchorEffect
+import com.jan.food.presentation.components.camera.CameraFeedEffect
 import com.jan.food.presentation.components.camera.rememberCameraFeedOffsetFraction
 import org.koin.compose.viewmodel.koinViewModel
 
@@ -52,7 +52,7 @@ fun HomeScreen(
     // Drive the shared feed's slide position from this screen's state, and read the controller's
     // live offset so feed-attached content (buttons) moves in lock-step with the feed.
     val anchor = state.cameraFeedAnchor()
-    CameraFeedAnchorEffect(anchor)
+    CameraFeedEffect(anchor = anchor, darken = anchor == CameraFeedAnchor.REVEAL_THREE_QUARTERS)
     val offsetFraction = rememberCameraFeedOffsetFraction()
     val showingResults = state.productCheck != null && !state.isLoading
 

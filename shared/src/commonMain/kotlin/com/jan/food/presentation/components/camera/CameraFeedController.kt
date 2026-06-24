@@ -12,10 +12,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 
-/** Duration of the shared camera feed's slide/corner animation. */
+/** Duration of the shared camera feed's slide/corner/darken animations. */
 internal const val CameraFeedSlideMillis = 500
 
-/** Easing of the shared camera feed's slide/corner animation. */
+/** Easing of the shared camera feed's slide/corner/darken animations. */
 internal val CameraFeedSlideEasing = FastOutSlowInEasing
 
 /**
@@ -31,20 +31,43 @@ enum class CameraFeedAnchor(val offsetFraction: Float) {
 }
 
 /**
- * Controls the slide position of the single shared camera feed hosted by [CameraBackground]. Obtain
- * it from anywhere under the feed via [LocalCameraFeedController]; drive it declaratively with
- * [CameraFeedAnchorEffect]. Screens that want to align their own content with the feed read the
- * live, animated slide via [rememberCameraFeedOffsetFraction].
+ * Central control surface for the single shared camera feed hosted by [CameraBackground]. Holds
+ * every adjustable feed property; [CameraBackground] renders from it and screens drive it
+ * declaratively with [CameraFeedEffect]. Obtain it from anywhere under the feed via
+ * [LocalCameraFeedController], or read the live slide via [rememberCameraFeedOffsetFraction].
  */
 @Stable
 class CameraFeedController {
-    /** The anchor the feed is currently sliding toward; set via [CameraFeedAnchorEffect]. */
-    var targetAnchor by mutableStateOf(CameraFeedAnchor.FULL)
+    /** The anchor the feed is currently sliding toward. */
+    var anchor by mutableStateOf(CameraFeedAnchor.FULL)
         internal set
 
-    internal fun request(anchor: CameraFeedAnchor) {
-        targetAnchor = anchor
+    /** When true, the feed renders blurred (natively, per platform). */
+    var blurred by mutableStateOf(false)
+        internal set
+
+    /** When true, tapping the feed triggers tap-to-focus (Android only, and only while [FULL]). */
+    var tapToFocus by mutableStateOf(true)
+        internal set
+
+    /** When true, a translucent black scrim dims the feed. */
+    var darken by mutableStateOf(false)
+        internal set
+
+    internal fun apply(
+        anchor: CameraFeedAnchor,
+        blurred: Boolean,
+        tapToFocus: Boolean,
+        darken: Boolean,
+    ) {
+        this.anchor = anchor
+        this.blurred = blurred
+        this.tapToFocus = tapToFocus
+        this.darken = darken
     }
+
+    /** Restores the default, full-screen, sharp, focusable, undimmed feed. */
+    internal fun reset() = apply(CameraFeedAnchor.FULL, blurred = false, tapToFocus = true, darken = false)
 }
 
 /**
@@ -56,18 +79,28 @@ val LocalCameraFeedController = staticCompositionLocalOf<CameraFeedController> {
 }
 
 /**
- * Declaratively requests [anchor] for the shared camera feed while this effect is in composition,
- * resetting the feed to [CameraFeedAnchor.FULL] when it leaves. Mirrors the
- * `BackHandler`/system-UI-controller pattern: any screen can drive the feed from its own scope.
+ * Declaratively configures the shared camera feed while this effect is in composition, restoring the
+ * defaults when it leaves. Mirrors the `BackHandler`/system-UI-controller pattern: any screen drives
+ * the feed from its own scope, and only the controlling (composed) screen's settings apply.
  *
- * @param anchor the slide position to request while composed.
+ * @param anchor the feed slide position (default [CameraFeedAnchor.FULL]).
+ * @param blurred whether the feed renders blurred (default `false`).
+ * @param tapToFocus whether tap-to-focus is enabled (default `true`).
+ * @param darken whether a translucent black scrim dims the feed (default `false`).
  */
 @Composable
-fun CameraFeedAnchorEffect(anchor: CameraFeedAnchor) {
+fun CameraFeedEffect(
+    anchor: CameraFeedAnchor = CameraFeedAnchor.FULL,
+    blurred: Boolean = false,
+    tapToFocus: Boolean = true,
+    darken: Boolean = false,
+) {
     val controller = LocalCameraFeedController.current
-    LaunchedEffect(anchor) { controller.request(anchor) }
+    LaunchedEffect(anchor, blurred, tapToFocus, darken) {
+        controller.apply(anchor, blurred, tapToFocus, darken)
+    }
     DisposableEffect(Unit) {
-        onDispose { controller.request(CameraFeedAnchor.FULL) }
+        onDispose { controller.reset() }
     }
 }
 
@@ -81,7 +114,7 @@ fun CameraFeedAnchorEffect(anchor: CameraFeedAnchor) {
 fun rememberCameraFeedOffsetFraction(): Float {
     val controller = LocalCameraFeedController.current
     val fraction by animateFloatAsState(
-        targetValue = controller.targetAnchor.offsetFraction,
+        targetValue = controller.anchor.offsetFraction,
         animationSpec = tween(CameraFeedSlideMillis, easing = CameraFeedSlideEasing),
     )
     return fraction

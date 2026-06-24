@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.jan.food.domain.model.Allergen
 import com.jan.food.presentation.components.button.BackButton
 import com.jan.food.presentation.components.button.TapPulseState
+import com.jan.food.presentation.components.camera.CameraFeedEffect
 import com.jan.food.presentation.components.grid.ReactiveGrid
 import com.jan.food.presentation.components.pill.Pill
 import org.koin.compose.viewmodel.koinViewModel
@@ -60,6 +61,9 @@ fun MenuScreen(
     },
 ) {
     val state by viewModel.state.collectAsState()
+
+    // The menu uses the feed as a static blurred backdrop, with tap-to-focus disabled.
+    CameraFeedEffect(blurred = true, tapToFocus = false)
 
     Box(
         modifier = Modifier
