@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -25,8 +26,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.jan.food.presentation.util.Haptic
+import org.koin.compose.koinInject
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -102,6 +106,8 @@ fun ReactiveGrid(
     verticalSpacing: Dp = 16.dp,
     animation: ReactiveGridAnimation = ReactiveGridAnimation(),
 ) {
+    val haptic = koinInject<Haptic>()
+
     // The cell the expansion is centred on. Set on touch-down and kept through the return animation
     // (so the shrinking cell stays on top) until the next press moves it.
     var activeRow by remember { mutableStateOf(-1) }
@@ -128,6 +134,7 @@ fun ReactiveGrid(
                             activeCol = activeCol,
                             pressed = pressed,
                             animation = animation,
+                            haptic = haptic,
                             onPress = {
                                 activeRow = row
                                 activeCol = column
@@ -166,6 +173,7 @@ private fun ReactiveGridCell(
     activeCol: Int,
     pressed: Boolean,
     animation: ReactiveGridAnimation,
+    haptic: Haptic,
     onPress: () -> Unit,
     onRelease: () -> Unit,
     onCancel: () -> Unit,
@@ -195,22 +203,48 @@ private fun ReactiveGridCell(
     val translationSpec = spring<Offset>(animation.pushDamping, animation.pushStiffness)
     val scaleSpec = spring<Float>(animation.swellDamping, animation.swellStiffness)
 
+    // Only the pressed cell buzzes. Tracks whether it actually expanded, so the return buzz fires
+    // only after a real press (not on the initial rest).
+    var expanded by remember { mutableStateOf(false) }
+
     // Drive the cell to its current target whenever the press state or the active cell changes.
     // Held: the active cell swells and neighbours push out (staggered by ring); otherwise, home.
     LaunchedEffect(activeRow, activeCol, pressed) {
-        coroutineScope {
-            launch {
-                val targetScale = if (isActive && pressed) 1f + animation.pressScale else 1f
-                scale.animateTo(targetScale, scaleSpec)
-            }
-            launch {
-                if (pressed && !isActive && activeRow >= 0) {
-                    delay(animation.ringDelay * ring)
-                    val magnitudePx = with(density) { magnitude.toPx() }
-                    translation.animateTo(Offset(dirX, dirY) * magnitudePx, translationSpec)
-                } else {
-                    translation.animateTo(Offset.Zero, translationSpec)
+        if (pressed && activeRow >= 0) {
+            if (isActive) expanded = true
+            coroutineScope {
+                // Scale: the active cell swells; everyone else holds size 1.
+                launch {
+                    val targetScale = if (isActive) 1f + animation.pressScale else 1f
+                    if (isActive) {
+                        // Buzz the instant it reaches full size, before the spring overshoot.
+                        launch {
+                            snapshotFlow { scale.value }.first { it >= targetScale - ScalePeakEpsilon }
+                            haptic.performHeavyImpact()
+                        }
+                    }
+                    scale.animateTo(targetScale, scaleSpec)
                 }
+                // Translation: neighbours push radially out (staggered by ring); the active cell stays put.
+                launch {
+                    if (!isActive) {
+                        delay(animation.ringDelay * ring)
+                        val magnitudePx = with(density) { magnitude.toPx() }
+                        translation.animateTo(Offset(dirX, dirY) * magnitudePx, translationSpec)
+                    } else {
+                        translation.animateTo(Offset.Zero, translationSpec)
+                    }
+                }
+            }
+        } else {
+            // Return phase: buzz once as the pressed cell starts heading home, then spring back.
+            if (isActive && expanded) {
+                haptic.performMediumImpact()
+                expanded = false
+            }
+            coroutineScope {
+                launch { scale.animateTo(1f, scaleSpec) }
+                launch { translation.animateTo(Offset.Zero, translationSpec) }
             }
         }
     }
@@ -269,3 +303,6 @@ private fun ReactiveGridCell(
 /** Whether this position falls inside a `width` × `height` box anchored at the origin. */
 private fun Offset.isWithin(width: Int, height: Int): Boolean =
     x >= 0f && y >= 0f && x <= width && y <= height
+
+/** How close to the target scale counts as "reached the peak", so the buzz beats the spring overshoot. */
+private const val ScalePeakEpsilon = 0.01f

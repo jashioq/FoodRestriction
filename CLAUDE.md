@@ -36,9 +36,9 @@ Layered, dependencies point inward: `presentation → domain → data`.
 ## DI (Koin)
 
 - Modules by layer: `domainModule` (use cases, `factory {}`), `dataModule` (repository bindings +
-  network/data-source providers, `single {}`), `platformDataSourceModule` (`expect/actual`, platform
+  network/data-source providers, `single {}`), `platformModule` (`expect/actual`, platform
   pieces only — DataStore, SecureStore). Bind to the **fully-qualified domain interface**.
-- Common code can't live in `platformDataSourceModule` (it's `expect/actual`); put shared
+- Common code can't live in `platformModule` (it's `expect/actual`); put shared
   providers in `dataModule`.
 - Register modules in both `KoinInitializer.android.kt` and `.ios.kt`.
 
