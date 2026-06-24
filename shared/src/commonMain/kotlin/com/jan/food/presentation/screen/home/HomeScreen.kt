@@ -4,28 +4,29 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.button.CircleActionButton
 import com.jan.food.presentation.components.button.MenuButton
@@ -72,17 +73,19 @@ fun HomeScreen(
         }
 
         // Feed-attached foreground: translated in lock-step with the feed. In the results state,
-        // tapping the visible camera strip dismisses the results.
+        // touching the visible camera strip dismisses the results — on finger down, not finger up.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .offset(y = slide)
                 .then(
                     if (showingResults) {
-                        Modifier.clickable(
-                            indication = null,
-                            interactionSource = remember { MutableInteractionSource() },
-                        ) { viewModel.sendAction(HomeScreenAction.DismissResults) }
+                        Modifier.pointerInput(Unit) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                viewModel.sendAction(HomeScreenAction.DismissResults)
+                            }
+                        }
                     } else {
                         Modifier
                     },
@@ -118,6 +121,21 @@ fun HomeScreen(
 //                )
 //            }
 
+            AnimatedVisibility(
+                visible = showingResults,
+                enter = fadeIn(tween(MENU_FADE_MILLIS)),
+                exit = fadeOut(tween(MENU_FADE_MILLIS)),
+                modifier = Modifier.align(Alignment.TopCenter),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .size(width = 60.dp, height = 5.dp)
+                        .clip(RoundedCornerShape(percent = 50))
+                        .background(Color.White.copy(alpha = 0.8f)),
+                )
+            }
+
             // Only available in the idle state; fades out while loading or showing results.
             AnimatedVisibility(
                 visible = anchor == CameraFeedAnchor.FULL,
@@ -135,7 +153,6 @@ fun HomeScreen(
 
             CircleActionButton(
                 onClick = { viewModel.sendAction(HomeScreenAction.CheckProduct) },
-                isLoading = state.isLoading,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 32.dp),
