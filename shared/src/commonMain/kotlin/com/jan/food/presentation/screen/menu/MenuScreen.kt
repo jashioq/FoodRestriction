@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -51,6 +53,8 @@ fun MenuScreen(
     backButtonPulse: TapPulseState? = null,
     viewModel: MenuScreenViewModel = koinViewModel(),
 ) {
+    val state by viewModel.state.collectAsState()
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -71,10 +75,9 @@ fun MenuScreen(
             items = AllergenRows.map { row ->
                 row.map { allergen ->
                     @Composable {
-                        Pill {
+                        Pill(selected = allergen in state.selectedAllergens) {
                             Text(
                                 text = allergen.label(),
-                                color = Color.Black,
                                 maxLines = 1,
                                 softWrap = false,
                             )
@@ -82,7 +85,11 @@ fun MenuScreen(
                     }
                 }
             },
-            onItemClick = { _, _ -> /* TODO: toggle the tapped allergen once selection is wired. */ },
+            onItemClick = { rowIndex, columnIndex ->
+                viewModel.sendAction(
+                    MenuScreenAction.ToggleAllergen(AllergenRows[rowIndex][columnIndex]),
+                )
+            },
             horizontalSpacing = 10.dp,
             modifier = Modifier.align(Alignment.Center),
         )

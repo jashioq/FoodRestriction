@@ -6,6 +6,7 @@ import com.jan.food.domain.useCase.EmitSelectedAllergensUseCase
 import com.jan.food.domain.useCase.EmitSessionUseCase
 import com.jan.food.domain.useCase.LoginUseCase
 import com.jan.food.domain.useCase.LogoutUseCase
+import com.jan.food.domain.useCase.SaveSelectedAllergensUseCase
 import com.jan.food.domain.useCase.SetOnboardingFinishedUseCase
 import com.jan.food.navigation.NavigationViewModel
 import com.jan.food.presentation.screen.home.HomeScreenViewModel
@@ -37,6 +38,9 @@ val presentationModule = module {
     }
 
     factory {
-        MenuScreenViewModel()
+        MenuScreenViewModel(
+            emitSelectedAllergensUseCase = get<EmitSelectedAllergensUseCase>(),
+            saveSelectedAllergensUseCase = get<SaveSelectedAllergensUseCase>(),
+        )
     }
 }
