@@ -1,5 +1,9 @@
 package com.jan.food.presentation.screen.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -84,44 +88,50 @@ fun HomeScreen(
                     },
                 ),
         ) {
-            Column(
-                modifier = Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Top,
+//            Column(
+//                modifier = Modifier.fillMaxSize(),
+//                horizontalAlignment = Alignment.CenterHorizontally,
+//                verticalArrangement = Arrangement.Top,
+//            ) {
+//                Button(onClick = { viewModel.sendAction(HomeScreenAction.Login) }) {
+//                    Text("login")
+//                }
+//
+//                Button(onClick = { viewModel.sendAction(HomeScreenAction.Logout) }) {
+//                    Text("logout")
+//                }
+//
+//                Text(
+//                    text = "id token: ${state.session?.idToken?.take(10)}\n" +
+//                        "access token: ${state.session?.accessToken?.take(10)}\n" +
+//                        "refresh token: ${state.session?.refreshToken?.take(10)}",
+//                    color = Color.White,
+//                )
+//
+//                Text(
+//                    text = "barcode: ${state.productCheck?.barcode}\n" +
+//                        "name: ${state.productCheck?.name}\n" +
+//                        "source: ${state.productCheck?.source}\n" +
+//                        "found: ${state.productCheck?.found}\n" +
+//                        "results:\n${state.productCheck?.results}\n",
+//                    color = Color.White,
+//                )
+//            }
+
+            // Only available in the idle state; fades out while loading or showing results.
+            AnimatedVisibility(
+                visible = anchor == CameraFeedAnchor.FULL,
+                enter = fadeIn(tween(MENU_FADE_MILLIS)),
+                exit = fadeOut(tween(MENU_FADE_MILLIS)),
+                modifier = Modifier.align(Alignment.TopStart),
             ) {
-                Button(onClick = { viewModel.sendAction(HomeScreenAction.Login) }) {
-                    Text("login")
-                }
-
-                Button(onClick = { viewModel.sendAction(HomeScreenAction.Logout) }) {
-                    Text("logout")
-                }
-
-                Text(
-                    text = "id token: ${state.session?.idToken?.take(10)}\n" +
-                        "access token: ${state.session?.accessToken?.take(10)}\n" +
-                        "refresh token: ${state.session?.refreshToken?.take(10)}",
-                    color = Color.White,
-                )
-
-                Text(
-                    text = "barcode: ${state.productCheck?.barcode}\n" +
-                        "name: ${state.productCheck?.name}\n" +
-                        "source: ${state.productCheck?.source}\n" +
-                        "found: ${state.productCheck?.found}\n" +
-                        "results:\n${state.productCheck?.results}\n",
-                    color = Color.White,
+                MenuButton(
+                    onClick = { onMenuClick(state.selectedAllergens.map { it.tag }) },
+                    // Shared with the menu's back button so the two pulse in sync across navigation.
+                    pulse = menuButtonPulse,
+                    modifier = Modifier.padding(horizontal = 16.dp),
                 )
             }
-
-            MenuButton(
-                onClick = { onMenuClick(state.selectedAllergens.map { it.tag }) },
-                // Shared with the menu's back button so the two pulse in sync across navigation.
-                pulse = menuButtonPulse,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(horizontal = 16.dp),
-            )
 
             CircleActionButton(
                 onClick = { viewModel.sendAction(HomeScreenAction.CheckProduct) },
@@ -143,3 +153,5 @@ fun HomeScreen(
         }
     }
 }
+
+private const val MENU_FADE_MILLIS = 300
