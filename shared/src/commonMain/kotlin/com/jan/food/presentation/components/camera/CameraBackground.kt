@@ -16,12 +16,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.BlurredEdgeTreatment
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /** Top-corner radius the feed rounds to when slid down, approximating the device screen curvature. */
 private val FeedCornerRadius = 44.dp
+
+/** Blur radius of the custom drop shadow drawn behind the feed. */
+private val FeedShadowBlur = 28.dp
+
+/** Color (incl. alpha) of the custom drop shadow drawn behind the feed. */
+private val FeedShadowColor = Color.Black.copy(alpha = 0.6f)
 
 /** Alpha of the black scrim when the feed is darkened. */
 private const val DarkenAlpha = 0.8f
@@ -64,24 +72,33 @@ fun CameraBackground(
     )
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
-        // The feed's slide + rounded-corner geometry, shared by the preview and the darken scrim.
-        val feedModifier = Modifier
+        // The feed's slide geometry + rounded-corner shape, shared by the preview and darken scrim.
+        val feedShape = RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)
+        val feedGeometry = Modifier
             .fillMaxSize()
             .offset(y = maxHeight * offsetFraction)
-            .clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
 
         // White backdrop, only seen once the feed slides down and reveals it.
         Box(modifier = Modifier.fillMaxSize().background(Color.White))
 
+        // Custom drop shadow: a dark rounded shape matching the feed, blurred so it bleeds out and
+        // reads strongly against the white backdrop once slid. Off-screen and unseen at the full
+        // anchor. Drawn behind the feed.
+        Box(
+            modifier = feedGeometry
+                .blur(radius = FeedShadowBlur, edgeTreatment = BlurredEdgeTreatment.Unbounded)
+                .background(color = FeedShadowColor, shape = feedShape),
+        )
+
         CameraPreview(
-            modifier = feedModifier,
+            modifier = feedGeometry.clip(feedShape),
             onBarcodeScanned = { barcode -> latestBarcode = barcode },
             blurred = controller.blurred,
             tapToFocusEnabled = controller.tapToFocus && controller.anchor == CameraFeedAnchor.FULL,
         )
 
         if (darkenAlpha > 0f) {
-            Box(modifier = feedModifier.background(Color.Black.copy(alpha = darkenAlpha)))
+            Box(modifier = feedGeometry.clip(feedShape).background(Color.Black.copy(alpha = darkenAlpha)))
         }
 
         CompositionLocalProvider(LocalCameraFeedController provides controller) {
