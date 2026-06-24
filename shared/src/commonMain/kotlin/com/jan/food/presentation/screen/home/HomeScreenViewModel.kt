@@ -3,12 +3,14 @@ package com.jan.food.presentation.screen.home
 import com.jan.food.domain.model.Allergen
 import com.jan.food.domain.model.AuthSession
 import com.jan.food.domain.model.ProductCheck
+import com.jan.food.domain.model.RestrictionCheck
 import com.jan.food.domain.useCase.CheckProductParams
 import com.jan.food.domain.useCase.LoginParams
 import com.jan.food.domain.util.UseCase
 import com.jan.food.presentation.util.CoreViewModel
 import com.jan.food.util.Logger
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -113,11 +115,37 @@ class HomeScreenViewModel(
                     }
                 }
             }
+
+            is HomeScreenAction.SimulateScan -> {
+                vmScope.launch {
+                    stateFlow.update { state -> state.copy(productCheck = null, isLoading = true) }
+                    delay(DUMMY_SCAN_MILLIS)
+                    stateFlow.update { state ->
+                        state.copy(productCheck = DUMMY_PRODUCT_CHECK, isLoading = false)
+                    }
+                }
+            }
+
+            is HomeScreenAction.DismissResults -> {
+                stateFlow.update { state -> state.copy(productCheck = null, isLoading = false) }
+            }
         }
     }
 
     private companion object {
         const val DEFAULT_EMAIL = "test@test.com"
         const val DEFAULT_PASSWORD = "MyPass123!"
+
+        const val DUMMY_SCAN_MILLIS = 5_000L
+        val DUMMY_PRODUCT_CHECK = ProductCheck(
+            barcode = "0000000000000",
+            name = "Dummy Product",
+            source = "cache",
+            found = true,
+            results = listOf(
+                RestrictionCheck(restriction = "gluten", status = "contains"),
+                RestrictionCheck(restriction = "milk", status = "absent"),
+            ),
+        )
     }
 }
