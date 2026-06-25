@@ -19,11 +19,13 @@ import androidx.compose.ui.Modifier
  * - [NONE] — nothing drawn.
  * - [LOADING] — a line half the cutout's circumference travelling around it in a loop.
  * - [ALERT] — two red light beams sweeping around the cutout like a lighthouse, 180° apart.
+ * - [LOW_ALERT] — a yellow border pulsing around the cutout, with no beams.
  */
 enum class CutoutNotificationAnimation {
     NONE,
     LOADING,
     ALERT,
+    LOW_ALERT,
 }
 
 /**

@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import com.jan.food.presentation.components.cutout.animations.Alert
 import com.jan.food.presentation.components.cutout.animations.Loading
+import com.jan.food.presentation.components.cutout.animations.LowAlert
 
 /** Duration of every animation's enter (and exit) transition, in milliseconds. */
 private const val EnterExitMillis = 1000
@@ -39,6 +40,9 @@ fun CutoutBorder(
         }
         CutoutAnimation(visible = animation == CutoutNotificationAnimation.ALERT) { progress ->
             Alert(progress = progress)
+        }
+        CutoutAnimation(visible = animation == CutoutNotificationAnimation.LOW_ALERT) { progress ->
+            LowAlert(progress = progress)
         }
     }
 }

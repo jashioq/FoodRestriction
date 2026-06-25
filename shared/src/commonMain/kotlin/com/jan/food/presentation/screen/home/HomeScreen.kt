@@ -60,7 +60,7 @@ fun HomeScreen(
     CutoutNotificationEffect(
         animation = when (anchor) {
             CameraFeedAnchor.REVEAL_QUARTER -> CutoutNotificationAnimation.LOADING
-            CameraFeedAnchor.REVEAL_THREE_QUARTERS -> CutoutNotificationAnimation.ALERT
+            CameraFeedAnchor.REVEAL_THREE_QUARTERS -> CutoutNotificationAnimation.LOW_ALERT
             CameraFeedAnchor.FULL -> CutoutNotificationAnimation.NONE
         }
     )
