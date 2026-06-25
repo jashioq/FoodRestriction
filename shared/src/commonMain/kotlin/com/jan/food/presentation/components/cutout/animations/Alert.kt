@@ -39,20 +39,24 @@ import kotlin.math.tan
 
 // --- Tunable controls -----------------------------------------------------------------------------
 
-/** Beam color. */
+/** Beam color toward the far end of the beam. */
 private val BeamColor = Color.Red
 
+/** Beam color at the apex — a brighter, pink-ish red that blends into [BeamColor] along the length. */
+private val BeamNearColor = Color(0xFFFF5C7A)
+
 /**
- * Light intensity: scales brightness (alpha), color saturation (a dim beam washes toward grey) and
- * the [MaxReach] distance the beam carries. The live value is this ramped by the host `progress`.
+ * Light intensity: scales brightness (alpha) and color saturation (a dim beam washes toward grey),
+ * independently of size. The live value is this ramped by the host `progress`.
  */
 private const val Intensity = 1f
 
 /** Lens spread: the full angular width of each beam's cone, in degrees. Smaller = a narrower beam. */
 private const val SpreadDegrees = 44f
 
-/** Farthest distance a beam reaches at full [Intensity]. */
-private val MaxReach = 280.dp
+/** Beam size: how far each beam reaches. Scales length (and, via [SpreadDegrees], width) independently
+ * of [Intensity], so the beams can be larger or smaller without changing how bright they are. */
+private val BeamLength = 300.dp
 
 // --- Internal tuning ------------------------------------------------------------------------------
 
@@ -83,13 +87,13 @@ private val BeamBands = listOf(
 )
 
 /** Duration of one full sweep around the cutout, in milliseconds. */
-private const val DurationMillis = 2200
+private const val DurationMillis = 1000
 
 /** Sweep direction. `true` rotates clockwise; flip if it reads counter-clockwise. */
 private const val Clockwise = true
 
 /** Peak alpha of a beam at full intensity (kept below 1 so overlaps glow rather than clip). */
-private const val MaxAlpha = 0.85f
+private const val MaxAlpha = 0.95f
 
 /** A fully desaturated stand-in for [BeamColor], blended in as intensity drops. */
 private val WashedColor = Color(0xFFB0A0A0)
@@ -173,18 +177,22 @@ private fun BeamBandCanvas(
         val p = progress()
         if (p <= 0f) return@Canvas
 
+        // Size is independent of intensity: reach is fixed, only brightness/saturation ramp with p.
         val intensity = Intensity * p
-        val reach = MaxReach.toPx() * intensity
+        val reach = BeamLength.toPx()
         if (reach <= 0f) return@Canvas
 
-        // Brightness via alpha, saturation by blending toward grey as intensity falls.
-        val saturated = lerp(WashedColor, BeamColor, intensity.coerceIn(0f, 1f))
-        val peak = saturated.copy(alpha = (intensity * MaxAlpha).coerceIn(0f, 1f))
+        // Brightness via alpha, saturation by blending toward grey as intensity falls. Two endpoint
+        // colors — pink-ish near the apex, red toward the end — interpolated along the beam length.
+        val alpha = (intensity * MaxAlpha).coerceIn(0f, 1f)
+        val sat = intensity.coerceIn(0f, 1f)
+        val peakNear = lerp(WashedColor, BeamNearColor, sat).copy(alpha = alpha)
+        val peakFar = lerp(WashedColor, BeamColor, sat).copy(alpha = alpha)
 
         val baseAngle = (if (Clockwise) 1f else -1f) * sweep.floatValue * 360f
         // Two lamps 180° apart.
         for (beam in 0..1) {
-            drawBeam(center, baseAngle + beam * 180f, SpreadDegrees, reach, peak, band.distanceStops)
+            drawBeam(center, baseAngle + beam * 180f, SpreadDegrees, reach, peakNear, peakFar, band.distanceStops)
         }
     }
 }
@@ -258,7 +266,8 @@ private fun DrawScope.drawBeam(
     centerAngleDeg: Float,
     spreadDeg: Float,
     reach: Float,
-    color: Color,
+    nearColor: Color,
+    farColor: Color,
     bandStops: Array<Pair<Float, Float>>,
 ) {
     val angle = centerAngleDeg.toRadians()
@@ -283,7 +292,10 @@ private fun DrawScope.drawBeam(
             path = triangle,
             brush = Brush.radialGradient(
                 colorStops = Array(distanceStops.size) { i ->
-                    distanceStops[i].first to color.copy(alpha = color.alpha * distanceStops[i].second)
+                    val pos = distanceStops[i].first
+                    // Hue shifts from near to far along the length; alpha carries the distance falloff.
+                    val hue = lerp(nearColor, farColor, pos)
+                    pos to hue.copy(alpha = hue.alpha * distanceStops[i].second)
                 },
                 center = center,
                 radius = reach,
