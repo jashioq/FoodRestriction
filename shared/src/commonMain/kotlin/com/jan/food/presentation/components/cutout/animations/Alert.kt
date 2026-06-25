@@ -1,5 +1,8 @@
 package com.jan.food.presentation.components.cutout.animations
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,6 +35,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.cutout.DisplayCutoutType
 import com.jan.food.presentation.components.cutout.rememberDisplayCutout
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -54,9 +59,18 @@ private const val Intensity = 1f
 /** Lens spread: the full angular width of each beam's cone, in degrees. Smaller = a narrower beam. */
 private const val SpreadDegrees = 44f
 
-/** Beam size: how far each beam reaches. Scales length (and, via [SpreadDegrees], width) independently
- * of [Intensity], so the beams can be larger or smaller without changing how bright they are. */
+/** Beam size in stage one: how far each beam reaches. Scales length (and, via [SpreadDegrees], width)
+ * independently of [Intensity], so the beams can be larger or smaller without changing their brightness. */
 private val BeamLength = 300.dp
+
+/** Beam size in stage two, reached after [StageOneDurationMillis]. */
+private val StageTwoLength = 120.dp
+
+/** How long stage one lasts before easing down to the stage-two size and sweep speed. */
+private const val StageOneDurationMillis = 3000
+
+/** Duration of the eased stage-one → stage-two transition (size and sweep speed). */
+private const val StageTransitionMillis = 500
 
 // --- Internal tuning ------------------------------------------------------------------------------
 
@@ -86,8 +100,11 @@ private val BeamBands = listOf(
     ),
 )
 
-/** Duration of one full sweep around the cutout, in milliseconds. */
+/** Duration of one full sweep around the cutout in stage one, in milliseconds. */
 private const val DurationMillis = 1000
+
+/** Duration of one full sweep in stage two, in milliseconds (slower). */
+private const val StageTwoDurationMillis = 2000
 
 /** Sweep direction. `true` rotates clockwise; flip if it reads counter-clockwise. */
 private const val Clockwise = true
@@ -133,13 +150,24 @@ fun Alert(progress: Float, modifier: Modifier = Modifier) {
     // read inside each band's draw, so the bands stay in sync without recomposing.
     val currentProgress by rememberUpdatedState(progress)
     val sweep = remember { mutableFloatStateOf(0f) }
+
+    // Staged values, eased without snapping after stage one ends: beam size (dp) and sweep lap (millis).
+    val beamLengthDp = remember { Animatable(BeamLength.value) }
+    val lapMillis = remember { Animatable(DurationMillis.toFloat()) }
+    LaunchedEffect(Unit) {
+        delay(StageOneDurationMillis.toLong())
+        val spec = tween<Float>(durationMillis = StageTransitionMillis, easing = FastOutSlowInEasing)
+        launch { beamLengthDp.animateTo(StageTwoLength.value, spec) }
+        launch { lapMillis.animateTo(StageTwoDurationMillis.toFloat(), spec) }
+    }
+
     LaunchedEffect(Unit) {
         var lastNanos = 0L
         while (true) {
             withFrameNanos { now ->
                 if (lastNanos != 0L) {
                     val dt = (now - lastNanos) / 1_000_000_000f
-                    val turnsPerSecond = currentProgress * (1000f / DurationMillis)
+                    val turnsPerSecond = currentProgress * (1000f / lapMillis.value)
                     sweep.floatValue = (sweep.floatValue + turnsPerSecond * dt) % 1f
                 }
                 lastNanos = now
@@ -150,7 +178,13 @@ fun Alert(progress: Float, modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize()) {
         // Each band is its own blurred layer; stacked apex-to-tip they form the distance-graded blur.
         for (band in BeamBands) {
-            BeamBandCanvas(center = center, sweep = sweep, band = band, progress = { currentProgress })
+            BeamBandCanvas(
+                center = center,
+                sweep = sweep,
+                band = band,
+                progress = { currentProgress },
+                beamLengthDp = { beamLengthDp.value },
+            )
         }
     }
 }
@@ -167,6 +201,7 @@ private fun BeamBandCanvas(
     sweep: FloatState,
     band: BeamBand,
     progress: () -> Float,
+    beamLengthDp: () -> Float,
 ) {
     Canvas(
         modifier = Modifier
@@ -177,9 +212,10 @@ private fun BeamBandCanvas(
         val p = progress()
         if (p <= 0f) return@Canvas
 
-        // Size is independent of intensity: reach is fixed, only brightness/saturation ramp with p.
+        // Size is independent of intensity: it comes from the staged length, only brightness/saturation
+        // ramp with p.
         val intensity = Intensity * p
-        val reach = BeamLength.toPx()
+        val reach = beamLengthDp().dp.toPx()
         if (reach <= 0f) return@Canvas
 
         // Brightness via alpha, saturation by blending toward grey as intensity falls. Two endpoint
