@@ -1,124 +1,151 @@
 package com.jan.food.presentation.components.cutout.animations
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.jan.food.presentation.components.cutout.DisplayCutout
 import com.jan.food.presentation.components.cutout.DisplayCutoutType
 import com.jan.food.presentation.components.cutout.rememberCutoutOutlinePath
 import com.jan.food.presentation.components.cutout.rememberDisplayCutout
 
-/** Stroke width of the loading border. */
-private val BorderWidth = 3.dp
+/** Thickness of the travelling segment; centered on the cutout edge so half straddles each side. */
+private val StrokeWidth = 10.dp
 
-/** Border color. */
+/** Segment color. */
 private val BorderColor = Color.Blue
 
-/** Bottom-corner rounding of the notch border (the top edge sits flush with the screen edge). */
+/** Bottom-corner rounding of the notch outline (the top edge sits flush with the screen edge). */
 private val NotchCornerRadius = 18.dp
 
+/** Fraction of the cutout circumference the segment covers at any instant. */
+private const val SegmentFraction = 0.5f
+
+/** Duration of one full lap around the cutout, in milliseconds. */
+private const val DurationMillis = 1500
+
+/** Travel direction. `true` advances along the path (clockwise); flip if it reads counter-clockwise. */
+private const val Clockwise = false
+
 /**
- * The loading animation: a [BorderWidth] [BorderColor] outline hugging the *outside* of the device's
- * display cutout (so the whole stroke is visible, never hidden behind the cutout), or a full-width
- * line along the very top of the screen when there is no cutout. Fills the screen and draws nothing
- * else; it does not intercept input.
+ * The loading animation: a [StrokeWidth]-thick segment covering [SegmentFraction] of the device's
+ * display-cutout circumference, travelling around it in an endless loop. The stroke is centered on the
+ * cutout edge, so half is obscured by the cutout and half spills outside it — masking small geometry
+ * measurement errors. Fills the screen, draws nothing else, and does not intercept input.
  *
- * For now this is a static border; the travelling animation is layered on top of this geometry later.
+ * Continuity across the path's start/end seam is preserved with a dashed stroke whose pattern period
+ * equals the full path length: exactly one [SegmentFraction] "on" arc is ever visible, and when it
+ * runs off the path end the periodic pattern places its continuation at the start, so it never changes
+ * length or snaps as it spins. Animating the dash phase slides that arc around the loop.
  */
 @Composable
 fun Loading(modifier: Modifier = Modifier) {
     val cutout = rememberDisplayCutout()
     val outlinePath = rememberCutoutOutlinePath()
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val screenWidthPx = LocalWindowInfo.current.containerSize.width.toFloat()
 
-    Box(modifier = modifier.fillMaxSize()) {
-        // When the platform reports the exact cutout outline (Android API 31+), stroke it directly —
-        // it traces the true silhouette (e.g. a perfect circle for a punch-hole) at its real position.
-        // The outline is grown outward by the stroke width so the whole stroke sits outside the cutout.
-        if (outlinePath != null) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val strokePx = BorderWidth.toPx()
-                drawPath(
-                    path = outlinePath.grownOutward(strokePx),
-                    color = BorderColor,
-                    style = Stroke(width = strokePx),
-                )
-            }
-            return@Box
-        }
+    // The cutout outline is a closed loop; the no-cutout fallback is an open top-edge line.
+    val isClosed = outlinePath != null || cutout.type != DisplayCutoutType.NO_CUTOUT
 
-        if (cutout.type == DisplayCutoutType.NO_CUTOUT) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .fillMaxWidth()
-                    .height(BorderWidth)
-                    .background(BorderColor),
-            )
-            return@Box
-        }
+    val path = remember(outlinePath, cutout, density, layoutDirection, screenWidthPx) {
+        buildCenterlinePath(outlinePath, cutout, density, layoutDirection, screenWidthPx)
+    }
+    val total = remember(path, isClosed) { PathMeasure().apply { setPath(path, isClosed) }.length }
 
-        val shape = when (cutout.type) {
-            // Punch-holes and the Dynamic Island read as fully-rounded capsules/circles.
-            DisplayCutoutType.DYNAMIC_ISLAND, DisplayCutoutType.CUSTOM -> RoundedCornerShape(percent = 50)
-            // Notches meet the screen's top edge squarely and round only at the bottom. Grow the
-            // radius alongside the box so the rounded corners stay concentric with the cutout.
-            DisplayCutoutType.LARGE_NOTCH, DisplayCutoutType.SMALL_NOTCH ->
-                RoundedCornerShape(
-                    bottomStart = NotchCornerRadius + BorderWidth,
-                    bottomEnd = NotchCornerRadius + BorderWidth
-                )
+    val transition = rememberInfiniteTransition(label = "cutoutLoading")
+    val phase by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = DurationMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "phase",
+    )
 
-            DisplayCutoutType.NO_CUTOUT -> RoundedCornerShape(0.dp)
-        }
+    Canvas(modifier = modifier.fillMaxSize()) {
+        if (total <= 0f) return@Canvas
 
-        // Enlarge the box by the stroke width on every side and shift it out by the same amount, so
-        // the inner edge of the (inward-drawn) border lands exactly on the cutout edge.
-        Box(
-            modifier = Modifier
-                .offset(x = cutout.offset.x - BorderWidth, y = cutout.offset.y - BorderWidth)
-                .size(
-                    width = cutout.size.width + BorderWidth * 2,
-                    height = cutout.size.height + BorderWidth * 2
-                )
-                .border(BorderWidth, BorderColor, shape),
+        // One "on" arc of segmentLength followed by a "gap" filling the rest of the loop. The pattern
+        // period equals total, so only one arc shows; shifting the phase by total over the cycle
+        // slides it once around. Negate for clockwise (dash phase advances the pattern backwards).
+        val segmentLength = total * SegmentFraction
+        val dashPhase = (if (Clockwise) -1f else 1f) * phase * total
+        val effect = PathEffect.dashPathEffect(
+            intervals = floatArrayOf(segmentLength, total - segmentLength),
+            phase = dashPhase,
+        )
+
+        drawPath(
+            path = path,
+            color = BorderColor,
+            style = Stroke(width = StrokeWidth.toPx(), cap = StrokeCap.Round, pathEffect = effect),
         )
     }
 }
 
 /**
- * Returns a copy of this path scaled about its center so every edge moves outward by [outset]/2 (the
- * stroke half-width), leaving a centered stroke of width [outset] sitting entirely outside the
- * original outline. Cutout silhouettes are convex and roughly centered, so a center scale is a good
- * approximation of a true outward offset.
+ * Builds the centerline [Path] the segment travels along, running directly on the cutout edge (the
+ * centered stroke straddles it). Uses the platform's exact outline when available; otherwise derives
+ * the outline from the per-type shape and cutout box, or an open top-edge line when there's no cutout.
  */
-private fun Path.grownOutward(outset: Float): Path {
-    val bounds = getBounds()
-    if (bounds.width <= 0f || bounds.height <= 0f) return this
+private fun buildCenterlinePath(
+    outlinePath: Path?,
+    cutout: DisplayCutout,
+    density: Density,
+    layoutDirection: LayoutDirection,
+    screenWidthPx: Float,
+): Path {
+    if (outlinePath != null) return outlinePath
 
-    val scaleX = (bounds.width + outset) / bounds.width
-    val scaleY = (bounds.height + outset) / bounds.height
-    val matrix = Matrix().apply {
-        values[Matrix.ScaleX] = scaleX
-        values[Matrix.ScaleY] = scaleY
-        values[Matrix.TranslateX] = bounds.center.x * (1 - scaleX)
-        values[Matrix.TranslateY] = bounds.center.y * (1 - scaleY)
+    if (cutout.type == DisplayCutoutType.NO_CUTOUT) {
+        return Path().apply {
+            moveTo(0f, 0f)
+            lineTo(screenWidthPx, 0f)
+        }
     }
+
+    val shape = when (cutout.type) {
+        // Punch-holes and the Dynamic Island read as fully-rounded capsules/circles.
+        DisplayCutoutType.DYNAMIC_ISLAND, DisplayCutoutType.CUSTOM -> RoundedCornerShape(percent = 50)
+        // Notches meet the screen's top edge squarely and round only at the bottom.
+        DisplayCutoutType.LARGE_NOTCH, DisplayCutoutType.SMALL_NOTCH ->
+            RoundedCornerShape(bottomStart = NotchCornerRadius, bottomEnd = NotchCornerRadius)
+
+        DisplayCutoutType.NO_CUTOUT -> RoundedCornerShape(0.dp)
+    }
+
+    val sizePx = with(density) { Size(cutout.size.width.toPx(), cutout.size.height.toPx()) }
+    val offsetPx = with(density) { Offset(cutout.offset.x.toPx(), cutout.offset.y.toPx()) }
+    val outline = shape.createOutline(sizePx, layoutDirection, density)
     return Path().apply {
-        addPath(this@grownOutward)
-        transform(matrix)
+        addOutline(outline)
+        translate(offsetPx)
     }
 }
