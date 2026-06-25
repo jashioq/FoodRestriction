@@ -58,11 +58,11 @@ fun HomeScreen(
     val anchor = state.cameraFeedAnchor()
     CameraFeedEffect(anchor = anchor, darken = anchor == CameraFeedAnchor.REVEAL_THREE_QUARTERS)
     CutoutNotificationEffect(
-        animation = if (anchor == CameraFeedAnchor.REVEAL_QUARTER) {
-            CutoutNotificationAnimation.LOADING
-        } else {
-            CutoutNotificationAnimation.NONE
-        },
+        animation = when (anchor) {
+            CameraFeedAnchor.REVEAL_QUARTER -> CutoutNotificationAnimation.LOADING
+            CameraFeedAnchor.REVEAL_THREE_QUARTERS -> CutoutNotificationAnimation.ALERT
+            CameraFeedAnchor.FULL -> CutoutNotificationAnimation.NONE
+        }
     )
     val offsetFraction = rememberCameraFeedOffsetFraction()
     val showingResults = state.productCheck != null && !state.isLoading

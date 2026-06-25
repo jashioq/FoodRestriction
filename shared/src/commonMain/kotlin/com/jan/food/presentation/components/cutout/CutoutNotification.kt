@@ -16,12 +16,14 @@ import androidx.compose.ui.Modifier
 /**
  * The animation the cutout notification plays around the device's display cutout.
  *
- * - [NONE] — just the static border.
+ * - [NONE] — nothing drawn.
  * - [LOADING] — a line half the cutout's circumference travelling around it in a loop.
+ * - [ALERT] — two red light beams sweeping around the cutout like a lighthouse, 180° apart.
  */
 enum class CutoutNotificationAnimation {
     NONE,
     LOADING,
+    ALERT,
 }
 
 /**

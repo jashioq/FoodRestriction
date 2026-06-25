@@ -12,6 +12,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.jan.food.presentation.components.cutout.animations.Alert
 import com.jan.food.presentation.components.cutout.animations.Loading
 
 /** Duration of every animation's enter (and exit) transition, in milliseconds. */
@@ -35,6 +36,9 @@ fun CutoutBorder(
     Box(modifier = modifier.fillMaxSize()) {
         CutoutAnimation(visible = animation == CutoutNotificationAnimation.LOADING) { progress ->
             Loading(progress = progress)
+        }
+        CutoutAnimation(visible = animation == CutoutNotificationAnimation.ALERT) { progress ->
+            Alert(progress = progress)
         }
     }
 }
