@@ -1,4 +1,4 @@
-package com.jan.food.presentation.components.camera
+package com.jan.food.presentation.components.cutout.animations
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -18,8 +18,11 @@ import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import com.jan.food.presentation.components.cutout.DisplayCutoutType
+import com.jan.food.presentation.components.cutout.rememberCutoutOutlinePath
+import com.jan.food.presentation.components.cutout.rememberDisplayCutout
 
-/** Stroke width of the cutout border. */
+/** Stroke width of the loading border. */
 private val BorderWidth = 3.dp
 
 /** Border color. */
@@ -29,13 +32,15 @@ private val BorderColor = Color.Blue
 private val NotchCornerRadius = 18.dp
 
 /**
- * Draws a [BorderWidth] [BorderColor] outline hugging the *outside* of the device's display cutout
- * (so the whole stroke is visible, never hidden behind the cutout), or a full-width line along the
- * very top of the screen when there is no cutout. Fills the screen and is meant to be overlaid on top
- * of all other content via [CutoutBorderOverlay]; it draws nothing else and does not intercept input.
+ * The loading animation: a [BorderWidth] [BorderColor] outline hugging the *outside* of the device's
+ * display cutout (so the whole stroke is visible, never hidden behind the cutout), or a full-width
+ * line along the very top of the screen when there is no cutout. Fills the screen and draws nothing
+ * else; it does not intercept input.
+ *
+ * For now this is a static border; the travelling animation is layered on top of this geometry later.
  */
 @Composable
-fun CutoutBorder(modifier: Modifier = Modifier) {
+fun Loading(modifier: Modifier = Modifier) {
     val cutout = rememberDisplayCutout()
     val outlinePath = rememberCutoutOutlinePath()
 
@@ -72,7 +77,11 @@ fun CutoutBorder(modifier: Modifier = Modifier) {
             // Notches meet the screen's top edge squarely and round only at the bottom. Grow the
             // radius alongside the box so the rounded corners stay concentric with the cutout.
             DisplayCutoutType.LARGE_NOTCH, DisplayCutoutType.SMALL_NOTCH ->
-                RoundedCornerShape(bottomStart = NotchCornerRadius + BorderWidth, bottomEnd = NotchCornerRadius + BorderWidth)
+                RoundedCornerShape(
+                    bottomStart = NotchCornerRadius + BorderWidth,
+                    bottomEnd = NotchCornerRadius + BorderWidth
+                )
+
             DisplayCutoutType.NO_CUTOUT -> RoundedCornerShape(0.dp)
         }
 
@@ -81,7 +90,10 @@ fun CutoutBorder(modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .offset(x = cutout.offset.x - BorderWidth, y = cutout.offset.y - BorderWidth)
-                .size(width = cutout.size.width + BorderWidth * 2, height = cutout.size.height + BorderWidth * 2)
+                .size(
+                    width = cutout.size.width + BorderWidth * 2,
+                    height = cutout.size.height + BorderWidth * 2
+                )
                 .border(BorderWidth, BorderColor, shape),
         )
     }
@@ -108,17 +120,5 @@ private fun Path.grownOutward(outset: Float): Path {
     return Path().apply {
         addPath(this@grownOutward)
         transform(matrix)
-    }
-}
-
-/**
- * Wraps [content] and overlays the [CutoutBorder] on top of it, so the cutout outline is always
- * visible above every screen. Place this around the app's navigation host.
- */
-@Composable
-fun CutoutBorderOverlay(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Box(modifier = modifier.fillMaxSize()) {
-        content()
-        CutoutBorder()
     }
 }

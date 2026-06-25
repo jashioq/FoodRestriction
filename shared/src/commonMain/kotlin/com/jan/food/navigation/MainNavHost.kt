@@ -10,7 +10,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.jan.food.presentation.components.button.rememberTapPulseState
 import com.jan.food.presentation.components.camera.CameraBackground
-import com.jan.food.presentation.components.camera.CutoutBorderOverlay
+import com.jan.food.presentation.components.cutout.CutoutNotification
 import com.jan.food.presentation.screen.home.HomeScreen
 import com.jan.food.presentation.screen.home.HomeScreenDestination
 import com.jan.food.presentation.screen.menu.MenuScreen
@@ -22,8 +22,7 @@ fun MainNavHost() {
 
     val navButtonPulse = rememberTapPulseState()
 
-    // Overlay the cutout border on top of everything so it stays visible across all screens.
-    CutoutBorderOverlay {
+    CutoutNotification {
         CameraBackground { barcode ->
             NavHost(
                 navController = navController,

@@ -5,7 +5,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -33,6 +32,8 @@ import com.jan.food.presentation.components.button.MenuButton
 import com.jan.food.presentation.components.button.TapPulseState
 import com.jan.food.presentation.components.camera.CameraFeedAnchor
 import com.jan.food.presentation.components.camera.CameraFeedEffect
+import com.jan.food.presentation.components.cutout.CutoutNotificationAnimation
+import com.jan.food.presentation.components.cutout.CutoutNotificationEffect
 import com.jan.food.presentation.components.camera.rememberCameraFeedOffsetFraction
 import com.jan.food.presentation.screen.home.view.HomeLoadingView
 import com.jan.food.presentation.screen.home.view.HomeResultsView
@@ -56,6 +57,13 @@ fun HomeScreen(
     // live offset so feed-attached content (buttons) moves in lock-step with the feed.
     val anchor = state.cameraFeedAnchor()
     CameraFeedEffect(anchor = anchor, darken = anchor == CameraFeedAnchor.REVEAL_THREE_QUARTERS)
+    CutoutNotificationEffect(
+        animation = if (anchor == CameraFeedAnchor.REVEAL_QUARTER) {
+            CutoutNotificationAnimation.LOADING
+        } else {
+            CutoutNotificationAnimation.NONE
+        },
+    )
     val offsetFraction = rememberCameraFeedOffsetFraction()
     val showingResults = state.productCheck != null && !state.isLoading
 

@@ -1,4 +1,4 @@
-package com.jan.food.presentation.components.camera
+package com.jan.food.presentation.components.cutout
 
 import android.os.Build
 import androidx.compose.runtime.Composable

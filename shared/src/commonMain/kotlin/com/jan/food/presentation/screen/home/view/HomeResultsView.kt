@@ -6,7 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.jan.food.presentation.components.camera.rememberDisplayCutout
+import com.jan.food.presentation.components.cutout.rememberDisplayCutout
 
 /**
  * Content shown in the revealed area above the camera feed once a scan's results are ready
