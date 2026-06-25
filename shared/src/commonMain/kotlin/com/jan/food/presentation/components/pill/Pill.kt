@@ -28,7 +28,7 @@ private val BorderWidth = 3.dp
 private const val SelectionAnimationMillis = 300
 
 /** Unselected look: a raised white chip with a [LightGray] border and black content. */
-private val UnselectedBackground = Color.White
+private val UnselectedBackground = Color(0xFFFFFDF7)
 private val UnselectedBorder = LightGray
 private val UnselectedContent = Color.Black
 private val UnselectedElevation = 8.dp

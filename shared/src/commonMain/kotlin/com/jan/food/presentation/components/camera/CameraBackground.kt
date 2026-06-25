@@ -84,8 +84,7 @@ fun CameraBackground(
             .fillMaxSize()
             .offset(y = maxHeight * offsetFraction)
 
-        // White backdrop, only seen once the feed slides down and reveals it.
-        Box(modifier = Modifier.fillMaxSize().background(Color.White))
+        Box(modifier = Modifier.fillMaxSize().background(Color(0xFFFFFDF7)))
 
         // Custom drop shadow: a dark rounded shape matching the feed, blurred so it bleeds out and
         // reads strongly against the white backdrop once slid. Off-screen and unseen at the full

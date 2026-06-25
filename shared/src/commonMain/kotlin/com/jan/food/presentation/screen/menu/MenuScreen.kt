@@ -68,7 +68,7 @@ fun MenuScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White.copy(alpha = 0.5f)),
+            .background(Color(0xFFFFFDF7).copy(alpha = 0.5f)),
     )
 
     Box(modifier = Modifier.fillMaxSize().displayCutoutPadding()) {
