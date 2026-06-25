@@ -26,17 +26,21 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.util.lerp
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.jan.food.presentation.components.cutout.DisplayCutoutType
+import com.jan.food.presentation.components.cutout.rememberCutoutOutlinePath
 import com.jan.food.presentation.components.cutout.rememberDisplayCutout
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -67,10 +71,30 @@ private val BeamLength = 300.dp
 private val StageTwoLength = 120.dp
 
 /** How long stage one lasts before easing down to the stage-two size and sweep speed. */
-private const val StageOneDurationMillis = 3000
+private const val StageOneDurationMillis = 5000
 
 /** Duration of the eased stage-one → stage-two transition (size and sweep speed). */
 private const val StageTransitionMillis = 500
+
+/** Thickness of the pulsing cutout border; centered on the edge so it straddles the cutout, masking
+ * minor measurement errors the way the loading border does. */
+private val BorderThickness = 12.dp
+
+/** Blur softening the border so it fades toward its edges into light. */
+private val BorderBlur = 7.dp
+
+/** Brightness pulses per full beam rotation; synced to the sweep so it slows with it across stages. */
+private const val BorderPulsesPerLap = 2f
+
+/** Border alpha at the dim trough and bright peak of a pulse (in stage one). */
+private const val BorderMinAlpha = 0.3f
+private const val BorderMaxAlpha = 1f
+
+/** Border thickness in stage two — thinner than [BorderThickness]. */
+private val StageTwoBorderThickness = 7.dp
+
+/** Border brightness multiplier in stage two — dimmer than stage one's 1.0. */
+private const val StageTwoBorderIntensity = 0.7f
 
 // --- Internal tuning ------------------------------------------------------------------------------
 
@@ -151,14 +175,13 @@ fun Alert(progress: Float, modifier: Modifier = Modifier) {
     val currentProgress by rememberUpdatedState(progress)
     val sweep = remember { mutableFloatStateOf(0f) }
 
-    // Staged values, eased without snapping after stage one ends: beam size (dp) and sweep lap (millis).
-    val beamLengthDp = remember { Animatable(BeamLength.value) }
-    val lapMillis = remember { Animatable(DurationMillis.toFloat()) }
+    // Stage factor (0 = stage one, 1 = stage two), eased once after stage one ends. Every stage-two
+    // change — beam size, sweep speed, border size and brightness — is derived from it, so they stay
+    // in sync and transition without snapping.
+    val stage = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay(StageOneDurationMillis.toLong())
-        val spec = tween<Float>(durationMillis = StageTransitionMillis, easing = FastOutSlowInEasing)
-        launch { beamLengthDp.animateTo(StageTwoLength.value, spec) }
-        launch { lapMillis.animateTo(StageTwoDurationMillis.toFloat(), spec) }
+        stage.animateTo(1f, tween(durationMillis = StageTransitionMillis, easing = FastOutSlowInEasing))
     }
 
     LaunchedEffect(Unit) {
@@ -167,7 +190,8 @@ fun Alert(progress: Float, modifier: Modifier = Modifier) {
             withFrameNanos { now ->
                 if (lastNanos != 0L) {
                     val dt = (now - lastNanos) / 1_000_000_000f
-                    val turnsPerSecond = currentProgress * (1000f / lapMillis.value)
+                    val lapMillis = lerp(DurationMillis.toFloat(), StageTwoDurationMillis.toFloat(), stage.value)
+                    val turnsPerSecond = currentProgress * (1000f / lapMillis)
                     sweep.floatValue = (sweep.floatValue + turnsPerSecond * dt) % 1f
                 }
                 lastNanos = now
@@ -183,9 +207,56 @@ fun Alert(progress: Float, modifier: Modifier = Modifier) {
                 sweep = sweep,
                 band = band,
                 progress = { currentProgress },
-                beamLengthDp = { beamLengthDp.value },
+                beamLengthDp = { lerp(BeamLength.value, StageTwoLength.value, stage.value) },
             )
         }
+        // The static pulsing border hugging the cutout edge, on top of the beams.
+        PulsingBorder(sweep = sweep, progress = { currentProgress }, stage = { stage.value })
+    }
+}
+
+/**
+ * A static border hugging the cutout's full circumference in [BeamColor]: a centered stroke (so it
+ * straddles the cutout edge, masking minor measurement errors) blurred toward its edges, pulsing
+ * between [BorderMinAlpha] and [BorderMaxAlpha] in sync with the beam sweep ([sweep]) so it slows
+ * alongside the rotation across stages. Does not spin.
+ *
+ * In stage two ([stage] → 1) it grows dimmer ([StageTwoBorderIntensity]) and thinner
+ * ([StageTwoBorderThickness]) alongside the shrinking beams.
+ *
+ * @param sweep the shared 0..1 sweep fraction driving the pulse phase.
+ * @param progress the host enter/exit ramp; the border is invisible at 0.
+ * @param stage the 0..1 stage factor (0 = stage one, 1 = stage two).
+ */
+@Composable
+private fun PulsingBorder(sweep: FloatState, progress: () -> Float, stage: () -> Float) {
+    val cutout = rememberDisplayCutout()
+    val outlinePath = rememberCutoutOutlinePath()
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val screenWidthPx = LocalWindowInfo.current.containerSize.width.toFloat()
+
+    val path = remember(outlinePath, cutout, density, layoutDirection, screenWidthPx) {
+        buildCutoutOutlinePath(outlinePath, cutout, density, layoutDirection, screenWidthPx)
+    }
+
+    Canvas(modifier = Modifier.fillMaxSize().blur(BorderBlur, BlurredEdgeTreatment.Unbounded)) {
+        val p = progress()
+        if (p <= 0f) return@Canvas
+        val s = stage()
+
+        // Pulse phase rides the sweep, so it speeds up / slows down exactly with the rotation.
+        val pulse = (0.5 + 0.5 * cos(2.0 * PI * sweep.floatValue * BorderPulsesPerLap)).toFloat()
+        val stageIntensity = lerp(1f, StageTwoBorderIntensity, s)
+        val alpha = ((BorderMinAlpha + (BorderMaxAlpha - BorderMinAlpha) * pulse) * Intensity * p * stageIntensity)
+            .coerceIn(0f, 1f)
+        val thickness = lerp(BorderThickness.value, StageTwoBorderThickness.value, s).dp
+
+        drawPath(
+            path = path,
+            color = BeamColor.copy(alpha = alpha),
+            style = Stroke(width = thickness.toPx(), cap = StrokeCap.Round),
+        )
     }
 }
 

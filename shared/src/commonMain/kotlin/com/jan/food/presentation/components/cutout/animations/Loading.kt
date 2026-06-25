@@ -2,7 +2,6 @@ package com.jan.food.presentation.components.cutout.animations
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,23 +11,15 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.addOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.jan.food.presentation.components.cutout.DisplayCutout
-import com.jan.food.presentation.components.cutout.DisplayCutoutType
 import com.jan.food.presentation.components.cutout.rememberCutoutOutlinePath
 import com.jan.food.presentation.components.cutout.rememberDisplayCutout
 
@@ -37,9 +28,6 @@ private val StrokeWidth = 10.dp
 
 /** Segment color. */
 private val BorderColor = Color.DarkGray
-
-/** Bottom-corner rounding of the notch outline (the top edge sits flush with the screen edge). */
-private val NotchCornerRadius = 18.dp
 
 /** Fraction of the cutout circumference the segment covers. */
 private const val SegmentFraction = 0.5f
@@ -76,10 +64,10 @@ fun Loading(progress: Float, modifier: Modifier = Modifier) {
     val screenWidthPx = LocalWindowInfo.current.containerSize.width.toFloat()
 
     // The cutout outline is a closed loop; the no-cutout fallback is an open top-edge line.
-    val isClosed = outlinePath != null || cutout.type != DisplayCutoutType.NO_CUTOUT
+    val isClosed = cutout.hasClosedOutline(outlinePath)
 
     val path = remember(outlinePath, cutout, density, layoutDirection, screenWidthPx) {
-        buildCenterlinePath(outlinePath, cutout, density, layoutDirection, screenWidthPx)
+        buildCutoutOutlinePath(outlinePath, cutout, density, layoutDirection, screenWidthPx)
     }
     val total = remember(path, isClosed) { PathMeasure().apply { setPath(path, isClosed) }.length }
 
@@ -120,45 +108,5 @@ fun Loading(progress: Float, modifier: Modifier = Modifier) {
             alpha = progress,
             style = Stroke(width = StrokeWidth.toPx(), cap = StrokeCap.Round, pathEffect = effect),
         )
-    }
-}
-
-/**
- * Builds the centerline [Path] the segment travels along, running directly on the cutout edge (the
- * centered stroke straddles it). Uses the platform's exact outline when available; otherwise derives
- * the outline from the per-type shape and cutout box, or an open top-edge line when there's no cutout.
- */
-private fun buildCenterlinePath(
-    outlinePath: Path?,
-    cutout: DisplayCutout,
-    density: Density,
-    layoutDirection: LayoutDirection,
-    screenWidthPx: Float,
-): Path {
-    if (outlinePath != null) return outlinePath
-
-    if (cutout.type == DisplayCutoutType.NO_CUTOUT) {
-        return Path().apply {
-            moveTo(0f, 0f)
-            lineTo(screenWidthPx, 0f)
-        }
-    }
-
-    val shape = when (cutout.type) {
-        // Punch-holes and the Dynamic Island read as fully-rounded capsules/circles.
-        DisplayCutoutType.DYNAMIC_ISLAND, DisplayCutoutType.CUSTOM -> RoundedCornerShape(percent = 50)
-        // Notches meet the screen's top edge squarely and round only at the bottom.
-        DisplayCutoutType.LARGE_NOTCH, DisplayCutoutType.SMALL_NOTCH ->
-            RoundedCornerShape(bottomStart = NotchCornerRadius, bottomEnd = NotchCornerRadius)
-
-        DisplayCutoutType.NO_CUTOUT -> RoundedCornerShape(0.dp)
-    }
-
-    val sizePx = with(density) { Size(cutout.size.width.toPx(), cutout.size.height.toPx()) }
-    val offsetPx = with(density) { Offset(cutout.offset.x.toPx(), cutout.offset.y.toPx()) }
-    val outline = shape.createOutline(sizePx, layoutDirection, density)
-    return Path().apply {
-        addOutline(outline)
-        translate(offsetPx)
     }
 }
