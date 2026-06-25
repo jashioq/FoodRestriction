@@ -245,8 +245,10 @@ private fun PulsingBorder(sweep: FloatState, progress: () -> Float, stage: () ->
         if (p <= 0f) return@Canvas
         val s = stage()
 
-        // Pulse phase rides the sweep, so it speeds up / slows down exactly with the rotation.
-        val pulse = (0.5 + 0.5 * cos(2.0 * PI * sweep.floatValue * BorderPulsesPerLap)).toFloat()
+        // Pulse phase rides the sweep, so it speeds up / slows down exactly with the rotation. Starts at
+        // the trough (sweep 0 = dim) so the first rise grows in step with the host's enter ramp instead
+        // of peaking instantly and getting clipped by it.
+        val pulse = (0.5 - 0.5 * cos(2.0 * PI * sweep.floatValue * BorderPulsesPerLap)).toFloat()
         val stageIntensity = lerp(1f, StageTwoBorderIntensity, s)
         val alpha = ((BorderMinAlpha + (BorderMaxAlpha - BorderMinAlpha) * pulse) * Intensity * p * stageIntensity)
             .coerceIn(0f, 1f)

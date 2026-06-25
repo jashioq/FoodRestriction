@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import kotlin.contracts.Effect
 
 /**
  * The animation the cutout notification plays around the device's display cutout.
@@ -57,18 +59,17 @@ val LocalCutoutNotificationController = staticCompositionLocalOf<CutoutNotificat
 }
 
 /**
- * Declaratively selects the cutout notification's [animation] while this effect is in composition,
- * restoring [CutoutNotificationAnimation.NONE] when it leaves. Mirrors the
- * `BackHandler`/[com.jan.food.presentation.components.camera.CameraFeedEffect] pattern: any screen drives the notification from its own scope.
+ * Declaratively selects the cutout notification's [animation] while this effect is in composition.
+ * Mirrors the `BackHandler`/[com.jan.food.presentation.components.camera.CameraFeedEffect]
+ * pattern: any screen drives the notification from its own scope.
  *
  * @param animation the animation to play (default [CutoutNotificationAnimation.NONE]).
  */
 @Composable
 fun CutoutNotificationEffect(animation: CutoutNotificationAnimation = CutoutNotificationAnimation.NONE) {
     val controller = LocalCutoutNotificationController.current
-    DisposableEffect(animation) {
+    LaunchedEffect(animation) {
         controller.apply(animation)
-        onDispose { controller.reset() }
     }
 }
 

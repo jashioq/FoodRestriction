@@ -38,7 +38,7 @@ private val BorderThickness = 16.dp
 private val BorderBlur = 7.dp
 
 /** Duration of one full brightness pulse, in milliseconds (constant speed). */
-private const val PulseDurationMillis = 1600
+private const val PulseDurationMillis = 1500
 
 /** Border alpha at the dim trough and bright peak of a pulse. */
 private const val BorderMinAlpha = 0.1f
@@ -82,7 +82,9 @@ fun LowAlert(progress: Float, modifier: Modifier = Modifier) {
     Canvas(modifier = modifier.fillMaxSize().blur(BorderBlur, BlurredEdgeTreatment.Unbounded)) {
         if (progress <= 0f) return@Canvas
 
-        val pulse = (0.5 + 0.5 * cos(2.0 * PI * phase.value)).toFloat()
+        // Start at the trough (phase 0 = dim) so the first rise runs a full half-period and grows
+        // in step with the host's enter ramp, instead of peaking instantly and getting clipped by it.
+        val pulse = (0.5 - 0.5 * cos(2.0 * PI * phase.value)).toFloat()
         val alpha = ((BorderMinAlpha + (BorderMaxAlpha - BorderMinAlpha) * pulse) * progress)
             .coerceIn(0f, 1f)
 

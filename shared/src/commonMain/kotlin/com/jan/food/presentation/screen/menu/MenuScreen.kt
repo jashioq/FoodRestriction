@@ -18,6 +18,8 @@ import com.jan.food.domain.model.Allergen
 import com.jan.food.presentation.components.button.BackButton
 import com.jan.food.presentation.components.button.TapPulseState
 import com.jan.food.presentation.components.camera.CameraFeedEffect
+import com.jan.food.presentation.components.cutout.CutoutNotificationAnimation
+import com.jan.food.presentation.components.cutout.CutoutNotificationEffect
 import com.jan.food.presentation.components.grid.ReactiveGrid
 import com.jan.food.presentation.components.pill.Pill
 import org.koin.compose.viewmodel.koinViewModel
@@ -64,6 +66,10 @@ fun MenuScreen(
 
     // The menu uses the feed as a static blurred backdrop, with tap-to-focus disabled.
     CameraFeedEffect(blurred = true, tapToFocus = false)
+
+    CutoutNotificationEffect(
+        CutoutNotificationAnimation.LOW_ALERT
+    )
 
     Box(
         modifier = Modifier
