@@ -2,25 +2,58 @@ package com.jan.food.presentation.components.camera
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toKString
+import kotlinx.cinterop.useContents
+import platform.UIKit.UIScreen
 import platform.posix.getenv
 import platform.posix.uname
 import platform.posix.utsname
 
 /**
- * Classifies the iOS cutout by device model identifier (e.g. `iPhone15,2`). The app's minimum is
- * iOS 18.2, so the oldest supported devices are the iPhone XR/XS generation and iPhone SE (2nd gen);
- * everything earlier is irrelevant. Unknown/newer identifiers default to [DisplayCutoutType.DYNAMIC_ISLAND],
- * the current iPhone silhouette.
+ * Resolves the iOS cutout by device model identifier (e.g. `iPhone15,2`) and derives its bounding
+ * box from known per-family dimensions, centered at the top of the screen. The app's minimum is
+ * iOS 18.2, so the oldest supported devices are the iPhone XR/XS generation and iPhone SE (2nd gen).
+ * iOS points map 1:1 to [androidx.compose.ui.unit.Dp].
  */
+@OptIn(ExperimentalForeignApi::class)
 @Composable
-actual fun rememberDisplayCutoutType(): DisplayCutoutType = remember {
-    cutoutTypeForIdentifier(deviceModelIdentifier())
+actual fun rememberDisplayCutout(): DisplayCutout = remember {
+    val type = cutoutTypeForIdentifier(deviceModelIdentifier())
+    val screenWidth = UIScreen.mainScreen.bounds.useContents { size.width }
+
+    when (type) {
+        DisplayCutoutType.DYNAMIC_ISLAND -> centered(type, screenWidth, width = 126.0, height = 37.33, top = 11.0)
+        DisplayCutoutType.LARGE_NOTCH -> centered(type, screenWidth, width = 209.0, height = 30.0, top = 0.0)
+        DisplayCutoutType.SMALL_NOTCH -> centered(type, screenWidth, width = 162.0, height = 33.0, top = 0.0)
+        DisplayCutoutType.NO_CUTOUT, DisplayCutoutType.CUSTOM ->
+            DisplayCutout(type, DpOffset.Zero, DpSize.Zero)
+    }
 }
+
+/** iOS doesn't expose a cutout outline path; callers fall back to the per-type derived shape. */
+@Composable
+actual fun rememberCutoutOutlinePath(): Path? = null
+
+/** Builds a [DisplayCutout] whose bounding box is horizontally centered at the top of the screen. */
+private fun centered(
+    type: DisplayCutoutType,
+    screenWidth: Double,
+    width: Double,
+    height: Double,
+    top: Double,
+): DisplayCutout = DisplayCutout(
+    type = type,
+    offset = DpOffset(((screenWidth - width) / 2).dp, top.dp),
+    size = DpSize(width.dp, height.dp),
+)
 
 private fun cutoutTypeForIdentifier(identifier: String): DisplayCutoutType =
     DeviceCutoutMap[identifier] ?: DisplayCutoutType.DYNAMIC_ISLAND

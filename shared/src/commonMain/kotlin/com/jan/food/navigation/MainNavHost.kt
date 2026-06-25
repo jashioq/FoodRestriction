@@ -10,6 +10,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.jan.food.presentation.components.button.rememberTapPulseState
 import com.jan.food.presentation.components.camera.CameraBackground
+import com.jan.food.presentation.components.camera.CutoutBorderOverlay
 import com.jan.food.presentation.screen.home.HomeScreen
 import com.jan.food.presentation.screen.home.HomeScreenDestination
 import com.jan.food.presentation.screen.menu.MenuScreen
@@ -21,29 +22,32 @@ fun MainNavHost() {
 
     val navButtonPulse = rememberTapPulseState()
 
-    CameraBackground { barcode ->
-        NavHost(
-            navController = navController,
-            startDestination = HomeScreenDestination,
-            enterTransition = { fadeIn(tween(FADE_MILLIS)) },
-            exitTransition = { fadeOut(tween(FADE_MILLIS)) },
-            popEnterTransition = { fadeIn(tween(FADE_MILLIS)) },
-            popExitTransition = { fadeOut(tween(FADE_MILLIS)) },
-        ) {
-            composable<HomeScreenDestination> {
-                HomeScreen(
-                    barcode = barcode,
-                    onMenuClick = { tags -> navController.navigate(MenuScreenDestination(tags)) },
-                    menuButtonPulse = navButtonPulse,
-                )
-            }
+    // Overlay the cutout border on top of everything so it stays visible across all screens.
+    CutoutBorderOverlay {
+        CameraBackground { barcode ->
+            NavHost(
+                navController = navController,
+                startDestination = HomeScreenDestination,
+                enterTransition = { fadeIn(tween(FADE_MILLIS)) },
+                exitTransition = { fadeOut(tween(FADE_MILLIS)) },
+                popEnterTransition = { fadeIn(tween(FADE_MILLIS)) },
+                popExitTransition = { fadeOut(tween(FADE_MILLIS)) },
+            ) {
+                composable<HomeScreenDestination> {
+                    HomeScreen(
+                        barcode = barcode,
+                        onMenuClick = { tags -> navController.navigate(MenuScreenDestination(tags)) },
+                        menuButtonPulse = navButtonPulse,
+                    )
+                }
 
-            composable<MenuScreenDestination> { entry ->
-                MenuScreen(
-                    initialSelectedTags = entry.toRoute<MenuScreenDestination>().selectedAllergenTags,
-                    onBackClick = { navController.popBackStack(HomeScreenDestination, inclusive = false) },
-                    backButtonPulse = navButtonPulse,
-                )
+                composable<MenuScreenDestination> { entry ->
+                    MenuScreen(
+                        initialSelectedTags = entry.toRoute<MenuScreenDestination>().selectedAllergenTags,
+                        onBackClick = { navController.popBackStack(HomeScreenDestination, inclusive = false) },
+                        backButtonPulse = navButtonPulse,
+                    )
+                }
             }
         }
     }
