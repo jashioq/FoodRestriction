@@ -1,17 +1,16 @@
 package com.jan.food.presentation.components.cutout.animations
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -37,16 +36,16 @@ import com.jan.food.presentation.components.cutout.rememberDisplayCutout
 private val StrokeWidth = 10.dp
 
 /** Segment color. */
-private val BorderColor = Color.Blue
+private val BorderColor = Color.DarkGray
 
 /** Bottom-corner rounding of the notch outline (the top edge sits flush with the screen edge). */
 private val NotchCornerRadius = 18.dp
 
-/** Fraction of the cutout circumference the segment covers at any instant. */
+/** Fraction of the cutout circumference the segment covers. */
 private const val SegmentFraction = 0.5f
 
 /** Duration of one full lap around the cutout, in milliseconds. */
-private const val DurationMillis = 1500
+private const val DurationMillis = 1000
 
 /** Travel direction. `true` advances along the path (clockwise); flip if it reads counter-clockwise. */
 private const val Clockwise = false
@@ -58,12 +57,18 @@ private const val Clockwise = false
  * measurement errors. Fills the screen, draws nothing else, and does not intercept input.
  *
  * Continuity across the path's start/end seam is preserved with a dashed stroke whose pattern period
- * equals the full path length: exactly one [SegmentFraction] "on" arc is ever visible, and when it
- * runs off the path end the periodic pattern places its continuation at the start, so it never changes
- * length or snaps as it spins. Animating the dash phase slides that arc around the loop.
+ * equals the full path length: exactly one "on" arc is ever visible, and when it runs off the path end
+ * the periodic pattern places its continuation at the start, so it never changes length or snaps as it
+ * spins. Animating the dash phase slides that arc around the loop.
+ *
+ * Enter/exit is owned by the caller and supplied as [progress] (0 = absent, 1 = fully shown): it scales
+ * both alpha and travel speed, so the segment fades in while accelerating from a standstill and fades
+ * out while coasting to a stop.
+ *
+ * @param progress the 0..1 enter/exit ramp from the host; the segment is invisible at 0.
  */
 @Composable
-fun Loading(modifier: Modifier = Modifier) {
+fun Loading(progress: Float, modifier: Modifier = Modifier) {
     val cutout = rememberDisplayCutout()
     val outlinePath = rememberCutoutOutlinePath()
     val density = LocalDensity.current
@@ -78,25 +83,32 @@ fun Loading(modifier: Modifier = Modifier) {
     }
     val total = remember(path, isClosed) { PathMeasure().apply { setPath(path, isClosed) }.length }
 
-    val transition = rememberInfiniteTransition(label = "cutoutLoading")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = DurationMillis, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "phase",
-    )
+    // Accumulated travel as a 0..1 fraction of the loop, integrated each frame at a speed scaled by
+    // progress (so it accelerates from rest on enter and coasts to a stop on exit).
+    val currentProgress by rememberUpdatedState(progress)
+    var travel by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        var lastNanos = 0L
+        while (true) {
+            withFrameNanos { now ->
+                if (lastNanos != 0L) {
+                    val dt = (now - lastNanos) / 1_000_000_000f
+                    val lapsPerSecond = currentProgress * (1000f / DurationMillis)
+                    travel = (travel + lapsPerSecond * dt) % 1f
+                }
+                lastNanos = now
+            }
+        }
+    }
 
     Canvas(modifier = modifier.fillMaxSize()) {
-        if (total <= 0f) return@Canvas
+        if (total <= 0f || progress <= 0f) return@Canvas
 
-        // One "on" arc of segmentLength followed by a "gap" filling the rest of the loop. The pattern
-        // period equals total, so only one arc shows; shifting the phase by total over the cycle
-        // slides it once around. Negate for clockwise (dash phase advances the pattern backwards).
+        // One "on" arc followed by a "gap" filling the rest of the loop. The pattern period equals
+        // total, so only one arc shows; shifting the phase by total slides it once around. Negate for
+        // clockwise (dash phase advances the pattern backwards).
         val segmentLength = total * SegmentFraction
-        val dashPhase = (if (Clockwise) -1f else 1f) * phase * total
+        val dashPhase = (if (Clockwise) -1f else 1f) * travel * total
         val effect = PathEffect.dashPathEffect(
             intervals = floatArrayOf(segmentLength, total - segmentLength),
             phase = dashPhase,
@@ -105,6 +117,7 @@ fun Loading(modifier: Modifier = Modifier) {
         drawPath(
             path = path,
             color = BorderColor,
+            alpha = progress,
             style = Stroke(width = StrokeWidth.toPx(), cap = StrokeCap.Round, pathEffect = effect),
         )
     }

@@ -58,7 +58,7 @@ fun HomeScreen(
     val anchor = state.cameraFeedAnchor()
     CameraFeedEffect(anchor = anchor, darken = anchor == CameraFeedAnchor.REVEAL_THREE_QUARTERS)
     CutoutNotificationEffect(
-        animation = if (anchor == CameraFeedAnchor.REVEAL_THREE_QUARTERS) {
+        animation = if (anchor == CameraFeedAnchor.REVEAL_QUARTER) {
             CutoutNotificationAnimation.LOADING
         } else {
             CutoutNotificationAnimation.NONE
