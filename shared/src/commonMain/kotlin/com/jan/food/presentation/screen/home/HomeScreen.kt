@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.jan.food.presentation.components.button.CircleActionButton
 import com.jan.food.presentation.components.button.MenuButton
 import com.jan.food.presentation.components.button.TapPulseState
@@ -46,7 +46,7 @@ fun HomeScreen(
     menuButtonPulse: TapPulseState? = null,
     viewModel: HomeScreenViewModel = koinViewModel()
 ) {
-    val state by viewModel.state.collectAsState()
+    val state by viewModel.state.collectAsStateWithLifecycle()
 
     // The camera feed is shared and hosted by the NavHost; forward its scans into the view model.
     LaunchedEffect(barcode) {
