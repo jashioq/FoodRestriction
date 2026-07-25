@@ -77,6 +77,31 @@ The body is the contract the change is reviewed against later, so requirements m
 stated here rather than left implicit in the spec. Out of scope is not optional — it is
 what makes scope creep detectable.
 
+## Connect dependencies (GitHub native)
+
+After all issues are created, mirror each `Blocked by:` line into GitHub's native
+Relationships field, so the dependency graph is visible in the UI and queryable.
+
+1. Build a number → global-id map for the issues just created:
+
+```bash
+   gh api "/repos/{owner}/{repo}/issues?state=open&per_page=100" \
+     --jq '.[] | [.number, .id] | @tsv'
+```
+
+2. For each `Blocked by: #B` edge on issue #A, post it — path takes #A's *number*,
+   body takes #B's *global id* (not its number):
+
+```bash
+   gh api --method POST \
+     "/repos/{owner}/{repo}/issues/A/dependencies/blocked_by" \
+     -F issue_id=<global id of B>
+```
+
+The `Blocked by:` line in the body stays regardless — it is the portable source of truth.
+The native relationship is a mirror of it, added for the GitHub UI and for tooling that
+reads the dependency graph.
+
 ## Publishing
 
 Create issues in dependency order, blockers first, so their numbers exist before anything
