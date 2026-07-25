@@ -10,8 +10,9 @@ Interview the user relentlessly about what they want to build, until you both un
 it the same way.
 
 Walk down each branch of the decision tree, resolving dependencies between decisions one
-at a time. Ask between one and three questions per message and wait for the answer. Give your
-recommended answer with each question and a one-line reason.
+at a time. Ask between one and five questions per message and wait for the answer. Suggest one
+recommended answer with each question and a one-line reason. You can ask either multiple choice
+questions or text input questions.
 
 If a fact can be found by exploring the repository, look it up rather than asking. The
 decisions, though, are theirs: put each one to them and wait.
