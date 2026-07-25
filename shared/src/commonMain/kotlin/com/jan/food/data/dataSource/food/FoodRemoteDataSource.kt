@@ -1,5 +1,6 @@
 package com.jan.food.data.dataSource.food
 
+import com.jan.food.OpenForMokkery
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.post
@@ -13,6 +14,7 @@ import io.ktor.http.contentType
  * @param httpClient the authenticated [HttpClient] that attaches the bearer token and points at the
  * API base URL.
  */
+@OpenForMokkery
 class FoodRemoteDataSource(
     private val httpClient: HttpClient,
 ) {
@@ -24,10 +26,12 @@ class FoodRemoteDataSource(
     suspend fun checkProduct(
         barcode: String,
         restrictions: List<String>,
-    ): Result<CheckResponse> = runCatching {
-        httpClient.post("/v1/check") {
-            contentType(ContentType.Application.Json)
-            setBody(CheckRequest(barcode = barcode, requestedRestrictions = restrictions))
-        }.body()
-    }
+    ): Result<CheckResponse> =
+        runCatching {
+            httpClient
+                .post("/v1/check") {
+                    contentType(ContentType.Application.Json)
+                    setBody(CheckRequest(barcode = barcode, requestedRestrictions = restrictions))
+                }.body()
+        }
 }
