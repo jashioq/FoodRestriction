@@ -1,5 +1,5 @@
-import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -8,15 +8,30 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
     alias(libs.plugins.buildConfig)
+    alias(libs.plugins.mokkery)
+    alias(libs.plugins.kotlinAllOpen)
+}
+
+// Opens @OpenForMokkery-annotated classes so Mokkery can mock otherwise-final in-module data
+// sources (e.g. FoodRemoteDataSource), which the compiler plugin cannot mock while final.
+allOpen {
+    annotation("com.jan.food.OpenForMokkery")
+}
+
+// Mocking a concrete class calls its real superclass constructor; FoodRemoteDataSource's HttpClient
+// parameter drags in HttpClientConfig, which Mokkery only instantiates with this flag set.
+mokkery {
+    stubs.allowConcreteClassInstantiation.set(true)
 }
 
 // App config resolved at build time: environment variable (CI) wins, then local.properties (local
 // dev). The buildConfig plugin bakes these into a generated AppConfig object compiled into the
 // binary, so they're available at runtime regardless of when Koin reads them.
-val appConfigProperties = Properties().apply {
-    val file = rootProject.file("local.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
-}
+val appConfigProperties =
+    Properties().apply {
+        val file = rootProject.file("local.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
 
 fun appConfigValue(key: String): String =
     System.getenv(key)
@@ -33,32 +48,38 @@ buildConfig {
 kotlin {
     listOf(
         iosArm64(),
-        iosSimulatorArm64()
+        iosSimulatorArm64(),
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "Shared"
             isStatic = true
         }
     }
-    
+
     jvm()
-    
+
     androidLibrary {
-       namespace = "com.jan.food.shared"
-       compileSdk = libs.versions.android.compileSdk.get().toInt()
-       minSdk = libs.versions.android.minSdk.get().toInt()
-    
-       compilerOptions {
-           jvmTarget = JvmTarget.JVM_11
-       }
-       androidResources {
-           enable = true
-       }
-       withHostTest {
-           isIncludeAndroidResources = true
-       }
+        namespace = "com.jan.food.shared"
+        compileSdk =
+            libs.versions.android.compileSdk
+                .get()
+                .toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
+
+        compilerOptions {
+            jvmTarget = JvmTarget.JVM_11
+        }
+        androidResources {
+            enable = true
+        }
+        withHostTest {
+            isIncludeAndroidResources = true
+        }
     }
-    
+
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
@@ -98,9 +119,9 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-            commonTest.dependencies {
-                implementation(libs.koin.test)
-            }
+            implementation(libs.koin.test)
+            implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.turbine)
         }
     }
 }

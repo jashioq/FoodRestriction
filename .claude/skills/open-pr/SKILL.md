@@ -2,12 +2,15 @@
 name: open-pr
 description: Open a pull request from the current branch, resolving conflicts against the base. Opens the PR; never merges it.
 disable-model-invocation: true
-argument-hint: "[base-branch, default main]"
+argument-hint: "[#ticket the PR implements] [base-branch, default main]"
 allowed-tools: Read, Grep, Glob, Bash
 ---
 
-Open a pull request from the current branch. The optional argument is the base branch;
-default `main`.
+Open a pull request from the current branch. 
+There are two arguments, first is required and second is optional.
+First parameter is ticket/s ID the pull request implements. If not provided stop and ask the user.
+Do not infer it from conversation history or branch name. The second argument is optional. It is
+the base branch - default `main`.
 
 ## 1. Check the branch is PR-ready
 
