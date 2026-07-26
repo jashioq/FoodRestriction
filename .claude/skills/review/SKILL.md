@@ -2,15 +2,15 @@
 name: review
 description: Review the current change along two independent axes — project standards and ticket conformance. Reports findings only; fixes nothing and files nothing.
 disable-model-invocation: true
-argument-hint: "[fixed-point] [#issue]"
+argument-hint: "[#issue] [fixed-point] "
 allowed-tools: Read, Grep, Glob, Bash, Task
 ---
 
 Review the change between a fixed point and `HEAD` along two axes, run as two independent
 reviewers whose findings are never combined.
 
-Arguments, both optional and order-independent: a **fixed point** (commit, branch, or tag)
-and an **issue reference** (`#12` or `12`).
+Arguments, both optional and order-independent: an **issue reference** (`#12` or `12`) 
+and a **fixed point** (commit, branch, or tag).
 
 ## 1. Resolve the fixed point
 
