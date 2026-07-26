@@ -2,12 +2,16 @@ package com.jan.food.data.repository
 
 import app.cash.turbine.test
 import com.jan.food.data.dataSource.auth.CognitoAuthClient
+import com.jan.food.domain.model.AuthSession
 import com.jan.food.domain.repository.SecureStorageRepository
 import com.jan.food.fixtures.authSession
 import com.jan.food.fixtures.authenticationResult
 import dev.mokkery.answering.returns
 import dev.mokkery.everySuspend
 import dev.mokkery.matcher.any
+import dev.mokkery.matcher.capture.Capture
+import dev.mokkery.matcher.capture.capture
+import dev.mokkery.matcher.capture.get
 import dev.mokkery.mock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
@@ -28,10 +32,13 @@ class AuthRepositoryTest {
     @Test
     fun `login - success persists serialized session and returns success`() =
         runTest {
+            val expected = authSession()
+            val slot = Capture.slot<String>()
             everySuspend { cognitoClient.loginWithPassword(any(), any()) } returns Result.success(authenticationResult())
-            everySuspend { secureStorage.putSecureString(any(), any()) } returns Result.success(Unit)
+            everySuspend { secureStorage.putSecureString(any(), capture(slot, any())) } returns Result.success(Unit)
 
             assertTrue(repository.login("user@example.com", "password").isSuccess)
+            assertEquals(expected, json.decodeFromString<AuthSession>(slot.get()))
         }
 
     @Test
